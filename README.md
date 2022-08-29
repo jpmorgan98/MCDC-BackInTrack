@@ -14,6 +14,6 @@ TODO list:
 2. Mesh tally. To implement the use of GPU [atomics](https://numba.readthedocs.io/en/stable/cuda/intrinsics.html?highlight=atomic).
 3. GPU [exclusive scan](https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda) for thread syncing and reproducibility. This completes branching-event adapter and allows running Numba event-based on GPU (but only with branchless collision).
 4. GPU [sorting](https://developer.nvidia.com/gpugems/gpugems2/part-vi-simulation-and-numerical-algorithms/chapter-46-improved-gpu-sorting) for efficient particle bank memory access.
-5. GPU adapter for multiplying events (such as fission and weight window).
+5. GPU adapter for multiplying events (such as fission and weight window). This allows running Numba event-based on GPU without branchless collision.
 6. Consolidate different types of adapter.
 7. Others: Run in multiple GPUs and nodes via MPI4Py. Introduce [PyOMP](https://tigress-web.princeton.edu/~jdh4/PyOMPintro.pdf) for CPU threading. Implement [particle consolidation](https://www.sciencedirect.com/science/article/pii/S0306454917304231?via%3Dihub) in history-based for GPU run. ...
