@@ -198,6 +198,9 @@ def GPU_exscan(a_in, a_out, N):
         for j in range(a_in.shape[1]):
             a_out[i+1,j] = a_out[i,j] + a_in[i,j]
 
+#def GPU_reduction():
+#    cuda.ds
+
 # ==================================
 # Utilities: event-based
 # ==================================
@@ -242,6 +245,7 @@ def make_kernels(alg, target):
         create  = adapter.compiler(CPU_create, target)
         exscan  = adapter.compiler(CPU_exscan, target)
     else:
+        get_idx = adapter.compiler(GPU_get_idx, target)
         create  = adapter.compiler(GPU_create, target)
         exscan  = adapter.compiler(GPU_exscan, target)
 
@@ -254,7 +258,8 @@ def make_kernels(alg, target):
     # =========================================================================
 
     global source, move, leakage, scattering, fission, branchless_collision
-
+    
+    #initialize_stack = adapter.event(initialize_stack, alg, target, EVENT_NONE)
     source     = adapter.event(source, alg, target, EVENT_SOURCE)
     move       = adapter.event(move, alg, target, EVENT_MOVE, branching=True)
     leakage    = adapter.event(leakage, alg, target, EVENT_LEAKAGE)
@@ -262,3 +267,4 @@ def make_kernels(alg, target):
     fission    = adapter.event(fission, alg, target, EVENT_FISSION, naive=True)
     branchless_collision = adapter.event(branchless_collision, alg, target, 
                                              EVENT_BRANCHLESS_COLLISION)
+

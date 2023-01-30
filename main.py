@@ -23,7 +23,7 @@ X          = 3.0
 branchless_collision = True
 
 # Parameters
-N_particle = int(1E5)
+N_particle = int(1E6)
 
 # =============================================================================
 # SETUP

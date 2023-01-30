@@ -1,4 +1,4 @@
-from numba import njit, cuda
+from numba import njit, cuda, jit
 
 import type_, kernel
 
@@ -167,6 +167,9 @@ def event(func, alg, target, event, branching=False, naive=False):
             kernel.rng_skip_ahead(i*mcdc['event_stride'][event], P, mcdc)
 
             # Perform event
+            #if target == 'gpu':
+            #    func[gpu_config(N, hostco)](P, mcdc)
+            #else:
             func(P, mcdc)
            
             # Update particle in the bank
@@ -206,7 +209,7 @@ def event(func, alg, target, event, branching=False, naive=False):
     # GPU-Event-based zone below
 
     def hardware_wrap(mcdc, hostco):
-        event = mcdc['stack_idx'][event]
+        #event: int = mcdc['stack_idx'][event]
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
         wrap[N_block, N_thread](mcdc, hostco)
     return hardware_wrap
@@ -217,7 +220,7 @@ def event(func, alg, target, event, branching=False, naive=False):
 
 def compiler(func, target):
     if target == 'cpu':
-        return njit(func)
+        return jit(func, nopython=True, nogil=True)
     else:
         return cuda.jit(func)
 

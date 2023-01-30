@@ -88,8 +88,10 @@ def EVENT_simulation(mcdc, hostco):
     # =========================================================================
     # Initialize simulation
     # =========================================================================
-
-    kernel.initialize_stack(mcdc, hostco)
+    
+    kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
+    
+    #kernel.initialize_stack(mcdc, hostco)
 
     # =========================================================================
     # Simulation loop
@@ -97,6 +99,7 @@ def EVENT_simulation(mcdc, hostco):
 
     it = 0
     while np.max(hostco['stack_size'][1:]) > 0:
+        #print('Whoop')
         it += 1
         # =====================================================================
         # Initialize event
