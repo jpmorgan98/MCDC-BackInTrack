@@ -23,7 +23,7 @@ X          = 3.0
 branchless_collision = True
 
 # Parameters
-N_particle = int(1E6)
+N_particle = int(1E5)
 
 # =============================================================================
 # SETUP
@@ -35,7 +35,7 @@ parser.add_argument('--mode', type=str, choices=['python', 'numba'],
                     default='numba')
 parser.add_argument('--alg', type=str, choices=['history', 'event'], 
                     default='history')
-parser.add_argument('--target', type=str, choices=['cpu', 'gpu'],
+parser.add_argument('--target', type=str, choices=['cpu', 'gpu', 'cpus'],
                     default='cpu')
 args, unargs = parser.parse_known_args()
 alg = args.alg
@@ -153,6 +153,8 @@ hostco['N_thread']   = mcdc['N_thread']
 hostco['stack_size'] = mcdc['stack_']['size']
 hostco['event_idx']  = mcdc['event_idx']
 
+
+print(mcdc['tally'].dtype)
 # =============================================================================
 # RUN
 # =============================================================================

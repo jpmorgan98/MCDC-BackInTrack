@@ -1,7 +1,7 @@
 import numpy as np
 import type_, kernel, adapter
 
-from numba import objmode
+from numba import objmode, jit, prange, cuda
 
 from constant import *
 
@@ -11,12 +11,13 @@ simulation = None
 # History-based
 # =============================================================================
 
+#@jit(nopython=True)
 def HISTORY_simulation(mcdc, hostco):
     # =========================================================================
     # Simulation loop
     # =========================================================================
 
-    for i_history in range(mcdc['N_history']):
+    for i_history in prange(mcdc['N_history']):
         # =====================================================================
         # Initialize history
         # =====================================================================
@@ -89,17 +90,15 @@ def EVENT_simulation(mcdc, hostco):
     # Initialize simulation
     # =========================================================================
     
-    kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
-    
     #kernel.initialize_stack(mcdc, hostco)
-
+    kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
+        
     # =========================================================================
     # Simulation loop
     # =========================================================================
-
+    print('To simulation')
     it = 0
     while np.max(hostco['stack_size'][1:]) > 0:
-        #print('Whoop')
         it += 1
         # =====================================================================
         # Initialize event
@@ -112,19 +111,19 @@ def EVENT_simulation(mcdc, hostco):
         # =================================================================
         # Event loop
         # =================================================================
-
+        #cuda.syncthreads()
         if event == EVENT_SOURCE:
-            kernel.source(mcdc, hostco)
+            kernel.source(mcdc, hostco, event)
         elif event == EVENT_MOVE:
-            kernel.move(mcdc, hostco)
+            kernel.move(mcdc, hostco, event)
         elif event == EVENT_SCATTERING:
-            kernel.scattering(mcdc, hostco)
+            kernel.scattering(mcdc, hostco, event)
         elif event == EVENT_FISSION:
-            kernel.fission(mcdc, hostco)
+            kernel.fission(mcdc, hostco, event)
         elif event == EVENT_LEAKAGE:
-            kernel.leakage(mcdc, hostco)
+            kernel.leakage(mcdc, hostco, event)
         elif event == EVENT_BRANCHLESS_COLLISION:
-            kernel.branchless_collision(mcdc, hostco)
+            kernel.branchless_collision(mcdc, hostco, event)
 
         '''
         print(hostco['stack_size'])
@@ -136,7 +135,7 @@ def EVENT_simulation(mcdc, hostco):
         print(mcdc['bank'])
         print('\n\n')
         '''
-
+    
 
 # =============================================================================
 # Factory

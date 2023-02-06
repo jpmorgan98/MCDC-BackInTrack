@@ -7,7 +7,7 @@ A particular goal of this repo is to demonstrate a working Python-based implemen
 Achievements so far:
 * Pure Python (history-based and event-based; only on CPU; useful for algorithm debugging)
 * Numba history-based and event-based on CPU (serial)
-* Numba event-based on GPU (on going)
+* Numba event-based on GPU (unperformant)
 
 TODO list:
 1. GPU [reduction](https://numba.readthedocs.io/en/stable/cuda/reduction.html?highlight=reduction) on global/small tally (in this test code, neutron leakage). This may require designing a new adapter type.

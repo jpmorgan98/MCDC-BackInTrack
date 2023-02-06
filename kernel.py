@@ -11,6 +11,9 @@ import type_, adapter
 # Events
 # =============================================================================
 
+leakeag_try = np.array([0,0], dtype=np.float32)
+leakeag_tryd = cuda.to_device(leakeag_try)
+
 def source(P, mcdc):
     P['x']     = -mcdc['X'] + 2.0*mcdc['X']*rng(P, mcdc)
     P['ux']    = -1.0 + 2.0*rng(P, mcdc)
@@ -86,7 +89,7 @@ def fission(P, mcdc):
             idx = mcdc['bank']['size']
             mcdc['bank']['content'][idx] = P_new
             mcdc['bank']['size'] += 1
-        else:
+        else: # Event based
             # Get the index of the next idle particle in the bank
             mcdc['stack_'][EVENT_NONE]['size'] -= 1
             idx      = mcdc['stack_'][EVENT_NONE]['size']
@@ -102,11 +105,22 @@ def fission(P, mcdc):
 
     terminate_particle(P)
 
+@cuda.jit
 def leakage(P, mcdc): 
     if P['ux'] > 0.0:
-        mcdc['tally'][1] += 1.0
+        cuda.atomic.add(mcdc['tally'], 1.0, 1.0)
     else:
-        mcdc['tally'][0] += 1.0
+        cuda.atomic.add(mcdc['tally'], 0.0, 1.0)
+        #atomic_add(mcdc['tally'], 1.0, 0)
+        #atomic_add(leakeag_tryd, 1.0, 1)
+            
+    '''
+    else:
+        if P['ux'] > 0.0:
+            mcdc['tally'][1] += 1.0
+        else:
+            mcdc['tally'][0] += 1.0
+    '''
     
     terminate_particle(P)
 
@@ -198,7 +212,15 @@ def GPU_exscan(a_in, a_out, N):
         for j in range(a_in.shape[1]):
             a_out[i+1,j] = a_out[i,j] + a_in[i,j]
 
-#def GPU_reduction():
+atomic_add = None
+def GPU_atomic_add(vec, ammount, index):
+    cuda.atomic.add(vec, index, ammount)
+
+def CPU_atomic_add(vec, ammount, index):
+    vec[index] += ammount
+
+#@cuda.reduce
+#def GPU_reduction(mcdc, flux):
 #    cuda.ds
 
 # ==================================
@@ -235,7 +257,7 @@ def make_kernels(alg, target):
     # ========================================
 
     global read_particle, record_particle, terminate_particle, get_idx, create,\
-           exscan
+           exscan, atomic_add
 
     read_particle   = adapter.compiler(read_particle, target)
     record_particle = adapter.compiler(record_particle, target)
@@ -244,10 +266,12 @@ def make_kernels(alg, target):
         get_idx = adapter.compiler(CPU_get_idx, target)
         create  = adapter.compiler(CPU_create, target)
         exscan  = adapter.compiler(CPU_exscan, target)
+        atomic_add = adapter.compiler(CPU_atomic_add, target)
     else:
-        get_idx = adapter.compiler(GPU_get_idx, target)
-        create  = adapter.compiler(GPU_create, target)
-        exscan  = adapter.compiler(GPU_exscan, target)
+        get_idx    = adapter.compiler(GPU_get_idx, target)
+        create     = adapter.compiler(GPU_create, target)
+        exscan     = adapter.compiler(GPU_exscan, target)
+        atomic_add = adapter.compiler(GPU_atomic_add, target)
 
     global initialize_stack
 
@@ -259,7 +283,6 @@ def make_kernels(alg, target):
 
     global source, move, leakage, scattering, fission, branchless_collision
     
-    #initialize_stack = adapter.event(initialize_stack, alg, target, EVENT_NONE)
     source     = adapter.event(source, alg, target, EVENT_SOURCE)
     move       = adapter.event(move, alg, target, EVENT_MOVE, branching=True)
     leakage    = adapter.event(leakage, alg, target, EVENT_LEAKAGE)

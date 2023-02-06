@@ -4,18 +4,21 @@ import type_, kernel
 
 from constant import *
 
+#event = None
+
 # =============================================================================
 # Loop adapters
 # =============================================================================
 
 def loop(func, target):
     if target == 'cpu':
-        return njit(func)
+        return jit(func)
     else:
         def wrap(mcdc, hostco):
             # Create device copies
             d_mcdc = cuda.to_device(mcdc)
             func(d_mcdc, hostco)
+            d_mcdc.copy_to_host(mcdc)
         return wrap
 
 # =============================================================================
@@ -32,7 +35,7 @@ def event(func, alg, target, event, branching=False, naive=False):
 
     wrap = None
 
-    def wrap_streaming(mcdc, hostco):
+    def wrap_streaming(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
         
@@ -77,7 +80,7 @@ def event(func, alg, target, event, branching=False, naive=False):
                 mcdc['stack_'][next_stack]['size'] += N
                 hostco['stack_size'][next_stack]   += N
         
-    def wrap_branching(mcdc, hostco):
+    def wrap_branching(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
 
@@ -148,7 +151,7 @@ def event(func, alg, target, event, branching=False, naive=False):
                 mcdc['secondaries_counter'][i, j] = 0
                 mcdc['secondaries_idx'][i, j]     = 0
     
-    def wrap_naive(mcdc, hostco):
+    def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
 
@@ -166,10 +169,6 @@ def event(func, alg, target, event, branching=False, naive=False):
             P['seed'] = mcdc['seed']
             kernel.rng_skip_ahead(i*mcdc['event_stride'][event], P, mcdc)
 
-            # Perform event
-            #if target == 'gpu':
-            #    func[gpu_config(N, hostco)](P, mcdc)
-            #else:
             func(P, mcdc)
            
             # Update particle in the bank
@@ -208,10 +207,18 @@ def event(func, alg, target, event, branching=False, naive=False):
 
     # GPU-Event-based zone below
 
-    def hardware_wrap(mcdc, hostco):
-        #event: int = mcdc['stack_idx'][event]
+    def hardware_wrap(mcdc, hostco, event):
+
+        # recorrecting event index in stack if branchless collision
+        if mcdc['branchless_collision']:
+            if event == 6:
+                event = 4
+            elif event == 5:
+                event = 3
+
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
-        wrap[N_block, N_thread](mcdc, hostco)
+        
+        wrap[N_block, N_thread](mcdc, hostco, event) #actaully running
     return hardware_wrap
 
 # =============================================================================
@@ -220,11 +227,17 @@ def event(func, alg, target, event, branching=False, naive=False):
 
 def compiler(func, target):
     if target == 'cpu':
-        return jit(func, nopython=True, nogil=True)
+        return jit(func, nopython=True, nogil=True)#, parallel=True)
+    elif target == 'cpus':
+        return jit(func, nopython=True, nogil=True, parallel=True)
     else:
         return cuda.jit(func)
+
+def parallel_compile(func):
+    return jit(func, nopython=True, nogil=True, parallel=True)
 
 def gpu_config(N, hostco):
     N_thread = hostco['N_thread']
     N_block = (N + (N_thread - 1)) // N_thread
+
     return N_block, N_thread
