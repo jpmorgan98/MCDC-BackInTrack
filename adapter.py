@@ -222,15 +222,14 @@ def event(func, alg, target, event, branching=False, naive=False):
                 event = 3
         #print(event)
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
-        
-        wrap[N_block, N_thread](mcdc, hostco, event) #actaully running
-
+        wrap[N_block, N_thread](mcdc, hostco)
 
     return hardware_wrap
 
 # =============================================================================
 # Utilities
 # =============================================================================
+
 
 def compiler(func, target):
     if target == 'cpu':

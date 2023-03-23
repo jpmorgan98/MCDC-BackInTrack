@@ -28,7 +28,7 @@ X          = 3.0
 branchless_collision = True
 
 # Parameters
-N_particle = int(1E5)
+N_particle = int(1E6) #int(1E5)
 
 # =============================================================================
 # SETUP
@@ -168,6 +168,8 @@ print(mcdc['event_idx'])
 # =============================================================================
 # RUN
 # =============================================================================
+
+#print(numba.typeof(mcdc))
 
 start = time.perf_counter()
 loop.simulation(mcdc, hostco)
