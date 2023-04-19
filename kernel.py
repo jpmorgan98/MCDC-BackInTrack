@@ -56,6 +56,7 @@ def move(P, mcdc):
                     P['event'] = EVENT_FISSION
 
 def branchless_collision(P, mcdc):
+    #print('in bc')
     SigmaT = mcdc['SigmaT']
     SigmaS = mcdc['SigmaS']
     SigmaF = mcdc['SigmaF']
@@ -103,24 +104,17 @@ def fission(P, mcdc):
             mcdc['stack_'][EVENT_MOVE]['content'][idx]  = idx_bank
             mcdc['stack_'][EVENT_MOVE]['size']         += 1
 
+
     terminate_particle(P)
 
-@cuda.jit
 def leakage(P, mcdc): 
+    #print('in leak')
     if P['ux'] > 0.0:
-        cuda.atomic.add(mcdc['tally'], 1.0, 1.0)
+        atomic_add(mcdc['tally'], 1, 1)
+        atomic_add(mcdc['tally'], 1, 2)
     else:
-        cuda.atomic.add(mcdc['tally'], 0.0, 1.0)
-        #atomic_add(mcdc['tally'], 1.0, 0)
-        #atomic_add(leakeag_tryd, 1.0, 1)
-            
-    '''
-    else:
-        if P['ux'] > 0.0:
-            mcdc['tally'][1] += 1.0
-        else:
-            mcdc['tally'][0] += 1.0
-    '''
+        atomic_add(mcdc['tally'], 1, 0)
+        atomic_add(mcdc['tally'], 1, 2)
     
     terminate_particle(P)
 
@@ -161,6 +155,7 @@ def rng_skip_ahead(n, P, mcdc):
         n >>= 1
 
     P['seed'] = (g_new*seed + c_new) & mod_mask
+    #sync()
 
 # =============================================================================
 # Utilities
@@ -171,6 +166,7 @@ def record_particle(P):
     P_rec['x']  = P['x']
     P_rec['ux'] = P['ux']
     P_rec['w']  = P['w']
+    #sync()
     return P_rec
 
 def read_particle(P_rec):
@@ -179,12 +175,14 @@ def read_particle(P_rec):
     P['ux']    = P_rec['ux']
     P['w']     = P_rec['w']
     P['alive'] = True
+    #sync()
     return P
 
 def terminate_particle(P):
     P['alive'] = False
     P['w']     = 0.0
     P['event'] = EVENT_NONE
+    #sync()
 
 # ==================================
 # Utilities: hardware-specific
@@ -218,6 +216,10 @@ def GPU_atomic_add(vec, ammount, index):
 
 def CPU_atomic_add(vec, ammount, index):
     vec[index] += ammount
+
+sync = None
+def GPU_sync():
+        cuda.syncthreads()
 
 #@cuda.reduce
 #def GPU_reduction(mcdc, flux):
@@ -272,6 +274,7 @@ def make_kernels(alg, target):
         create     = adapter.compiler(GPU_create, target)
         exscan     = adapter.compiler(GPU_exscan, target)
         atomic_add = adapter.compiler(GPU_atomic_add, target)
+        sync       = adapter.compiler(GPU_sync, target)
 
     global initialize_stack
 

@@ -83,6 +83,7 @@ def event(func, alg, target, event, branching=False, naive=False):
     def wrap_branching(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
+        # print(stack)
 
         # Stack size
         N = mcdc['stack_'][stack]['size']
@@ -208,14 +209,14 @@ def event(func, alg, target, event, branching=False, naive=False):
     # GPU-Event-based zone below
 
     def hardware_wrap(mcdc, hostco, event):
-
+        
         # recorrecting event index in stack if branchless collision
         if mcdc['branchless_collision']:
             if event == 6:
                 event = 4
             elif event == 5:
                 event = 3
-
+        print(event)
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
         
         wrap[N_block, N_thread](mcdc, hostco, event) #actaully running

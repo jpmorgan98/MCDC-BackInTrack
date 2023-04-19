@@ -108,6 +108,8 @@ def EVENT_simulation(mcdc, hostco):
         stack = np.argmax(hostco['stack_size'][1:]) + 1 # Offset for EVENT_NONE
         event = hostco['event_idx'][stack]
 
+        print(event)
+
         # =================================================================
         # Event loop
         # =================================================================

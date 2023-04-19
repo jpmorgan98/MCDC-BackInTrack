@@ -65,6 +65,8 @@ else:
     # Remove branchless_collision
     N_stack = N_EVENT - 1
 
+#N_stack = N_EVENT
+
 # Make types, kernels, and loops
 type_.make_type_global(N_particle, N_stack, alg)
 kernel.make_kernels(alg, target)
@@ -125,7 +127,7 @@ mcdc['stack_'][EVENT_SOURCE]['size'] = mcdc['N_particle']
 mcdc['stack_'][EVENT_NONE]['size']   = \
              mcdc['stack_'][EVENT_NONE]['content'].shape[0] - mcdc['N_particle']
 
-# Strides
+# Strides -- number of rands reqired for a given operation
 mcdc['history_stride']                           = RNG_STRIDE
 mcdc['event_stride'][EVENT_SOURCE]               = 2
 mcdc['event_stride'][EVENT_MOVE]                 = 2
@@ -162,4 +164,4 @@ print(mcdc['tally'].dtype)
 start = time.perf_counter()
 loop.simulation(mcdc, hostco)
 end = time.perf_counter()
-print(mode, alg, target, mcdc['tally']/N_particle, end-start)
+print(mode, alg, target, mcdc['tally'], end-start)

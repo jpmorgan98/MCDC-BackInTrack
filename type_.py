@@ -51,7 +51,7 @@ def make_type_global(N_particle, N_stack, alg):
 
               ('SigmaC', float64), ('SigmaS', float64), ('SigmaF', float64),
               ('nu', float64), ('SigmaT', float64), ('X', float64),
-              ('tally', float64, (2,)), 
+              ('tally', float64, (3,)), 
               
               ('rng_g', int64), ('rng_c', int64), ('rng_mod', uint64),
               ('seed', int64),
