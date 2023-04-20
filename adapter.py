@@ -125,10 +125,10 @@ def event(func, alg, target, event, branching=False, naive=False):
 
         # Launch exclusive scan algorithm [M. Harris 2007]
         #  to get secondaries global indices
-        
+        # We are reorginizing the stack structure to optimize where particles lie in the structure
         if (kernel.get_idx()[0] == 0):
             kernel.sync()
-            
+
             print('Serial exicution')
 
             kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)

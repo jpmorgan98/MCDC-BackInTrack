@@ -2,10 +2,6 @@ import numpy as np
 
 from constant import *
 
-float64 = np.float64
-int64   = np.int64
-uint64  = np.uint64
-bool_   = np.bool_
 
 # =============================================================================
 # Particles

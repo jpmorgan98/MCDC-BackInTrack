@@ -14,3 +14,8 @@ EVENT_FISSION              = 4
 EVENT_LEAKAGE              = 5
 EVENT_BRANCHLESS_COLLISION = 6
 N_EVENT                    = 7
+
+float64 = np.float64
+int64   = np.int64
+uint64  = np.uint64
+bool_   = np.bool_

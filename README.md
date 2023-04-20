@@ -17,3 +17,8 @@ TODO list:
 5. GPU adapter for multiplying events (such as fission and weight window). This allows running Numba event-based on GPU without branchless collision.
 6. Consolidate different types of adapter.
 7. Others: Run in multiple GPUs and nodes via MPI4Py. Introduce [PyOMP](https://tigress-web.princeton.edu/~jdh4/PyOMPintro.pdf) for CPU threading. Implement [particle consolidation](https://www.sciencedirect.com/science/article/pii/S0306454917304231?via%3Dihub) in history-based for GPU run. ...
+
+
+# How to Run
+Install the dependinces (same as MC/DC). And run the main script in your correct python enviroemtn
+`python main.py --alg=event --mode=numba --target=gpu`
