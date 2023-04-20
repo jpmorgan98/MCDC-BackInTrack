@@ -56,7 +56,7 @@ def move(P, mcdc):
                     P['event'] = EVENT_FISSION
 
 def branchless_collision(P, mcdc):
-    print('in bc')
+    #print('in bc')
     SigmaT = mcdc['SigmaT']
     SigmaS = mcdc['SigmaS']
     SigmaF = mcdc['SigmaF']
@@ -73,7 +73,7 @@ def scattering(P, mcdc):
     P['event'] = EVENT_MOVE
 
 def fission(P, mcdc):
-    print('in fission')
+    #print('in fission')
     nu = mcdc['nu']
 
     # Sample number of fission neutrons
@@ -188,6 +188,9 @@ def terminate_particle(P):
 # ==================================
 # Utilities: hardware-specific
 # ==================================
+
+#def GPU_thread_id():
+#    cuda.threadIdx
 
 get_idx = None
 def CPU_get_idx():

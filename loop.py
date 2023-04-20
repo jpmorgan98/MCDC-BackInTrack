@@ -119,7 +119,7 @@ def EVENT_simulation(mcdc, hostco):
         # =================================================================
         # Event loop
         # =================================================================
-        cuda.syncthreads
+        
         if event == EVENT_SOURCE:
             #print('Source! {}'.format(event))
             kernel.source(mcdc, hostco, event)

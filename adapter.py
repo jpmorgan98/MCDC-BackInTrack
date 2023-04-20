@@ -125,33 +125,36 @@ def event(func, alg, target, event, branching=False, naive=False):
 
         # Launch exclusive scan algorithm [M. Harris 2007]
         #  to get secondaries global indices
-        kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+        cuda.syncthreads
+        if (cuda.threadIdx == 0):
+            kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+            stride = 1
+            # Update all events stack based on the secondaries parameters
+            for i in range(start, N, stride):
+                # Get the stack and index
+                next_stack = mcdc['secondaries_stack'][i]
+                idx        = mcdc['secondaries_idx'][i, next_stack] + \
+                            mcdc['stack_'][next_stack]['size']
+                            
+                mcdc['stack_'][next_stack]['content'][idx] = \
+                        mcdc['stack_'][stack]['content'][i]
 
-        # Update all events stack based on the secondaries parameters
-        for i in range(start, N, stride):
-            # Get the stack and index
-            next_stack = mcdc['secondaries_stack'][i]
-            idx        = mcdc['secondaries_idx'][i, next_stack] + \
-                         mcdc['stack_'][next_stack]['size']
-                         
-            mcdc['stack_'][next_stack]['content'][idx] = \
-                    mcdc['stack_'][stack]['content'][i]
+                # If last particle, update stack sizes
+                if i == N-1:
+                    for j in range(mcdc['N_stack']):
+                        # Get secondaries size
+                        secondary_size = mcdc['secondaries_idx'][N-1,j] + \
+                                        mcdc['secondaries_counter'][N-1,j]
 
-            # If last particle, update stack sizes
-            if i == N-1:
+                        # Update stack sizes
+                        mcdc['stack_'][j]['size'] += secondary_size
+                        hostco['stack_size'][j]   += secondary_size
+                
+                # Reset secondaries parameters
                 for j in range(mcdc['N_stack']):
-                    # Get secondaries size
-                    secondary_size = mcdc['secondaries_idx'][N-1,j] + \
-                                     mcdc['secondaries_counter'][N-1,j]
-
-                    # Update stack sizes
-                    mcdc['stack_'][j]['size'] += secondary_size
-                    hostco['stack_size'][j]   += secondary_size
-            
-            # Reset secondaries parameters
-            for j in range(mcdc['N_stack']):
-                mcdc['secondaries_counter'][i, j] = 0
-                mcdc['secondaries_idx'][i, j]     = 0
+                    mcdc['secondaries_counter'][i, j] = 0
+                    mcdc['secondaries_idx'][i, j]     = 0
+        cuda.syncthreads
     
     def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event
