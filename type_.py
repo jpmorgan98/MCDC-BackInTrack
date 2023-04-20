@@ -70,7 +70,7 @@ def make_type_global(N_particle, N_stack, alg):
 
     # Sizes
     if alg == 'history':
-        bank_size  = 1000
+        bank_size  = 100000
         stack_size = 0
     else:
         bank_size  = int(2*N_particle)

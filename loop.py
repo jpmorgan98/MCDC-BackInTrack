@@ -85,13 +85,19 @@ def HISTORY_simulation(mcdc, hostco):
 # Event-based
 # =============================================================================
 
+#init_stack = None
+
 def EVENT_simulation(mcdc, hostco):
     # =========================================================================
     # Initialize simulation
     # =========================================================================
-    
-    #kernel.initialize_stack(mcdc, hostco)
+    #init_stack = None
+    #if mcdc['gpu']:
+    print('Location A')
     kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
+    #else:
+    #kernel.initialize_stack(mcdc, hostco)
+    #kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
         
     # =========================================================================
     # Simulation loop
@@ -108,23 +114,29 @@ def EVENT_simulation(mcdc, hostco):
         stack = np.argmax(hostco['stack_size'][1:]) + 1 # Offset for EVENT_NONE
         event = hostco['event_idx'][stack]
 
-        print(event)
+        #print(event)
 
         # =================================================================
         # Event loop
         # =================================================================
-        #cuda.syncthreads()
+        cuda.syncthreads
         if event == EVENT_SOURCE:
+            #print('Source! {}'.format(event))
             kernel.source(mcdc, hostco, event)
         elif event == EVENT_MOVE:
+            #print('Source! {}'.format(event))
             kernel.move(mcdc, hostco, event)
         elif event == EVENT_SCATTERING:
+            #print('Source! {}'.format(event))
             kernel.scattering(mcdc, hostco, event)
         elif event == EVENT_FISSION:
+            #print('Source! {}'.format(event))
             kernel.fission(mcdc, hostco, event)
         elif event == EVENT_LEAKAGE:
+            #print('Source! {}'.format(event))
             kernel.leakage(mcdc, hostco, event)
         elif event == EVENT_BRANCHLESS_COLLISION:
+            print('Branchless Collision!', event)
             kernel.branchless_collision(mcdc, hostco, event)
 
         '''

@@ -1,11 +1,16 @@
+print('Location --A{}'.format(1))
 import argparse, sys, time
 import numpy as np
 
 from numba import config
 
+
+
 import type_, kernel, loop
 
 from constant import *
+
+
 
 # =============================================================================
 # INPUT
@@ -66,6 +71,8 @@ else:
     N_stack = N_EVENT - 1
 
 #N_stack = N_EVENT
+
+print('Location -A')
 
 # Make types, kernels, and loops
 type_.make_type_global(N_particle, N_stack, alg)
@@ -141,6 +148,7 @@ if mcdc['branchless_collision']:
     # Replace (scattering, fission) with (leakage, branchless collision)
     mcdc['stack_idx'][EVENT_LEAKAGE]              = EVENT_SCATTERING
     mcdc['stack_idx'][EVENT_BRANCHLESS_COLLISION] = EVENT_FISSION
+    
     mcdc['event_idx'][EVENT_SCATTERING]           = EVENT_LEAKAGE
     mcdc['event_idx'][EVENT_FISSION]              = EVENT_BRANCHLESS_COLLISION
 
@@ -156,7 +164,7 @@ hostco['stack_size'] = mcdc['stack_']['size']
 hostco['event_idx']  = mcdc['event_idx']
 
 
-print(mcdc['tally'].dtype)
+print(mcdc['event_idx'])
 # =============================================================================
 # RUN
 # =============================================================================

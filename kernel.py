@@ -56,7 +56,7 @@ def move(P, mcdc):
                     P['event'] = EVENT_FISSION
 
 def branchless_collision(P, mcdc):
-    #print('in bc')
+    print('in bc')
     SigmaT = mcdc['SigmaT']
     SigmaS = mcdc['SigmaS']
     SigmaF = mcdc['SigmaF']
@@ -73,6 +73,7 @@ def scattering(P, mcdc):
     P['event'] = EVENT_MOVE
 
 def fission(P, mcdc):
+    print('in fission')
     nu = mcdc['nu']
 
     # Sample number of fission neutrons
@@ -108,7 +109,7 @@ def fission(P, mcdc):
     terminate_particle(P)
 
 def leakage(P, mcdc): 
-    #print('in leak')
+    print('in leak')
     if P['ux'] > 0.0:
         atomic_add(mcdc['tally'], 1, 1)
         atomic_add(mcdc['tally'], 1, 2)
@@ -205,6 +206,7 @@ def CPU_exscan(a_in, a_out, N):
     for i in range(N-1):
         a_out[i+1,:] = a_out[i,:] + a_in[i,:]
 # TODO!!!!!!!
+# perform exclusive scan 
 def GPU_exscan(a_in, a_out, N):
     for i in range(N-1):
         for j in range(a_in.shape[1]):
@@ -286,11 +288,10 @@ def make_kernels(alg, target):
 
     global source, move, leakage, scattering, fission, branchless_collision
     
-    source     = adapter.event(source, alg, target, EVENT_SOURCE)
-    move       = adapter.event(move, alg, target, EVENT_MOVE, branching=True)
-    leakage    = adapter.event(leakage, alg, target, EVENT_LEAKAGE)
-    scattering = adapter.event(scattering, alg, target, EVENT_SCATTERING)
-    fission    = adapter.event(fission, alg, target, EVENT_FISSION, naive=True)
-    branchless_collision = adapter.event(branchless_collision, alg, target, 
-                                             EVENT_BRANCHLESS_COLLISION)
+    source                  = adapter.event(source, alg, target, EVENT_SOURCE)
+    move                    = adapter.event(move, alg, target, EVENT_MOVE, branching=True)
+    leakage                 = adapter.event(leakage, alg, target, EVENT_LEAKAGE)
+    scattering              = adapter.event(scattering, alg, target, EVENT_SCATTERING)
+    fission                 = adapter.event(fission, alg, target, EVENT_FISSION, naive=True)
+    branchless_collision    = adapter.event(branchless_collision, alg, target, EVENT_BRANCHLESS_COLLISION)
 

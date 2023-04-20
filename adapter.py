@@ -89,6 +89,7 @@ def event(func, alg, target, event, branching=False, naive=False):
         N = mcdc['stack_'][stack]['size']
         start, stride = kernel.get_idx()
         for i in range(start, N, stride):
+            cuda.syncthreads
             # Get particle index from stack
             idx = mcdc['stack_'][stack]['content'][i]
 
@@ -216,10 +217,12 @@ def event(func, alg, target, event, branching=False, naive=False):
                 event = 4
             elif event == 5:
                 event = 3
-        print(event)
+        #print(event)
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
         
         wrap[N_block, N_thread](mcdc, hostco, event) #actaully running
+
+
     return hardware_wrap
 
 # =============================================================================
