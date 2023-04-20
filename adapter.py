@@ -1,8 +1,10 @@
-from numba import njit, cuda
+from numba import njit, cuda, jit
 
 import type_, kernel
 
 from constant import *
+
+#event = None
 
 # =============================================================================
 # Loop adapters
@@ -10,12 +12,13 @@ from constant import *
 
 def loop(func, target):
     if target == 'cpu':
-        return njit(func)
+        return jit(func)
     else:
         def wrap(mcdc, hostco):
             # Create device copies
             d_mcdc = cuda.to_device(mcdc)
             func(d_mcdc, hostco)
+            d_mcdc.copy_to_host(mcdc)
         return wrap
 
 # =============================================================================
@@ -32,7 +35,7 @@ def event(func, alg, target, event, branching=False, naive=False):
 
     wrap = None
 
-    def wrap_streaming(mcdc, hostco):
+    def wrap_streaming(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
         
@@ -77,14 +80,16 @@ def event(func, alg, target, event, branching=False, naive=False):
                 mcdc['stack_'][next_stack]['size'] += N
                 hostco['stack_size'][next_stack]   += N
         
-    def wrap_branching(mcdc, hostco):
+    def wrap_branching(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
+        # print(stack)
 
         # Stack size
         N = mcdc['stack_'][stack]['size']
         start, stride = kernel.get_idx()
         for i in range(start, N, stride):
+            cuda.syncthreads
             # Get particle index from stack
             idx = mcdc['stack_'][stack]['content'][i]
 
@@ -120,35 +125,38 @@ def event(func, alg, target, event, branching=False, naive=False):
 
         # Launch exclusive scan algorithm [M. Harris 2007]
         #  to get secondaries global indices
-        kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+        cuda.syncthreads
+        if (cuda.threadIdx == 0):
+            kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+            stride = 1
+            # Update all events stack based on the secondaries parameters
+            for i in range(start, N, stride):
+                # Get the stack and index
+                next_stack = mcdc['secondaries_stack'][i]
+                idx        = mcdc['secondaries_idx'][i, next_stack] + \
+                            mcdc['stack_'][next_stack]['size']
+                            
+                mcdc['stack_'][next_stack]['content'][idx] = \
+                        mcdc['stack_'][stack]['content'][i]
 
-        # Update all events stack based on the secondaries parameters
-        for i in range(start, N, stride):
-            # Get the stack and index
-            next_stack = mcdc['secondaries_stack'][i]
-            idx        = mcdc['secondaries_idx'][i, next_stack] + \
-                         mcdc['stack_'][next_stack]['size']
-                         
-            mcdc['stack_'][next_stack]['content'][idx] = \
-                    mcdc['stack_'][stack]['content'][i]
+                # If last particle, update stack sizes
+                if i == N-1:
+                    for j in range(mcdc['N_stack']):
+                        # Get secondaries size
+                        secondary_size = mcdc['secondaries_idx'][N-1,j] + \
+                                        mcdc['secondaries_counter'][N-1,j]
 
-            # If last particle, update stack sizes
-            if i == N-1:
+                        # Update stack sizes
+                        mcdc['stack_'][j]['size'] += secondary_size
+                        hostco['stack_size'][j]   += secondary_size
+                
+                # Reset secondaries parameters
                 for j in range(mcdc['N_stack']):
-                    # Get secondaries size
-                    secondary_size = mcdc['secondaries_idx'][N-1,j] + \
-                                     mcdc['secondaries_counter'][N-1,j]
-
-                    # Update stack sizes
-                    mcdc['stack_'][j]['size'] += secondary_size
-                    hostco['stack_size'][j]   += secondary_size
-            
-            # Reset secondaries parameters
-            for j in range(mcdc['N_stack']):
-                mcdc['secondaries_counter'][i, j] = 0
-                mcdc['secondaries_idx'][i, j]     = 0
+                    mcdc['secondaries_counter'][i, j] = 0
+                    mcdc['secondaries_idx'][i, j]     = 0
+        cuda.syncthreads
     
-    def wrap_naive(mcdc, hostco):
+    def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
 
@@ -166,7 +174,6 @@ def event(func, alg, target, event, branching=False, naive=False):
             P['seed'] = mcdc['seed']
             kernel.rng_skip_ahead(i*mcdc['event_stride'][event], P, mcdc)
 
-            # Perform event
             func(P, mcdc)
            
             # Update particle in the bank
@@ -205,10 +212,20 @@ def event(func, alg, target, event, branching=False, naive=False):
 
     # GPU-Event-based zone below
 
-    def hardware_wrap(mcdc, hostco):
-        event = mcdc['stack_idx'][event]
+    def hardware_wrap(mcdc, hostco, event):
+        
+        # recorrecting event index in stack if branchless collision
+        if mcdc['branchless_collision']:
+            if event == 6:
+                event = 4
+            elif event == 5:
+                event = 3
+        #print(event)
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
-        wrap[N_block, N_thread](mcdc, hostco)
+        
+        wrap[N_block, N_thread](mcdc, hostco, event) #actaully running
+
+
     return hardware_wrap
 
 # =============================================================================
@@ -217,11 +234,17 @@ def event(func, alg, target, event, branching=False, naive=False):
 
 def compiler(func, target):
     if target == 'cpu':
-        return njit(func)
+        return jit(func, nopython=True, nogil=True)#, parallel=True)
+    elif target == 'cpus':
+        return jit(func, nopython=True, nogil=True, parallel=True)
     else:
         return cuda.jit(func)
+
+def parallel_compile(func):
+    return jit(func, nopython=True, nogil=True, parallel=True)
 
 def gpu_config(N, hostco):
     N_thread = hostco['N_thread']
     N_block = (N + (N_thread - 1)) // N_thread
+
     return N_block, N_thread

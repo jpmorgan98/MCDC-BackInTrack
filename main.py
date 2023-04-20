@@ -1,11 +1,16 @@
+print('Location --A{}'.format(1))
 import argparse, sys, time
 import numpy as np
 
 from numba import config
 
+
+
 import type_, kernel, loop
 
 from constant import *
+
+
 
 # =============================================================================
 # INPUT
@@ -35,7 +40,7 @@ parser.add_argument('--mode', type=str, choices=['python', 'numba'],
                     default='numba')
 parser.add_argument('--alg', type=str, choices=['history', 'event'], 
                     default='history')
-parser.add_argument('--target', type=str, choices=['cpu', 'gpu'],
+parser.add_argument('--target', type=str, choices=['cpu', 'gpu', 'cpus'],
                     default='cpu')
 args, unargs = parser.parse_known_args()
 alg = args.alg
@@ -64,6 +69,10 @@ if branchless_collision:
 else:
     # Remove branchless_collision
     N_stack = N_EVENT - 1
+
+#N_stack = N_EVENT
+
+print('Location -A')
 
 # Make types, kernels, and loops
 type_.make_type_global(N_particle, N_stack, alg)
@@ -125,7 +134,7 @@ mcdc['stack_'][EVENT_SOURCE]['size'] = mcdc['N_particle']
 mcdc['stack_'][EVENT_NONE]['size']   = \
              mcdc['stack_'][EVENT_NONE]['content'].shape[0] - mcdc['N_particle']
 
-# Strides
+# Strides -- number of rands reqired for a given operation
 mcdc['history_stride']                           = RNG_STRIDE
 mcdc['event_stride'][EVENT_SOURCE]               = 2
 mcdc['event_stride'][EVENT_MOVE]                 = 2
@@ -139,6 +148,7 @@ if mcdc['branchless_collision']:
     # Replace (scattering, fission) with (leakage, branchless collision)
     mcdc['stack_idx'][EVENT_LEAKAGE]              = EVENT_SCATTERING
     mcdc['stack_idx'][EVENT_BRANCHLESS_COLLISION] = EVENT_FISSION
+    
     mcdc['event_idx'][EVENT_SCATTERING]           = EVENT_LEAKAGE
     mcdc['event_idx'][EVENT_FISSION]              = EVENT_BRANCHLESS_COLLISION
 
@@ -153,6 +163,8 @@ hostco['N_thread']   = mcdc['N_thread']
 hostco['stack_size'] = mcdc['stack_']['size']
 hostco['event_idx']  = mcdc['event_idx']
 
+
+print(mcdc['event_idx'])
 # =============================================================================
 # RUN
 # =============================================================================
@@ -160,4 +172,4 @@ hostco['event_idx']  = mcdc['event_idx']
 start = time.perf_counter()
 loop.simulation(mcdc, hostco)
 end = time.perf_counter()
-print(mode, alg, target, mcdc['tally']/N_particle, end-start)
+print(mode, alg, target, mcdc['tally'], end-start)
