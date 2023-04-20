@@ -89,7 +89,7 @@ def event(func, alg, target, event, branching=False, naive=False):
         N = mcdc['stack_'][stack]['size']
         start, stride = kernel.get_idx()
         for i in range(start, N, stride):
-            cuda.syncthreads
+            #cuda.syncthreads
             # Get particle index from stack
             idx = mcdc['stack_'][stack]['content'][i]
 
@@ -125,8 +125,12 @@ def event(func, alg, target, event, branching=False, naive=False):
 
         # Launch exclusive scan algorithm [M. Harris 2007]
         #  to get secondaries global indices
-        cuda.syncthreads
-        if (cuda.threadIdx == 0):
+        
+        if (kernel.get_idx()[0] == 0):
+            kernel.sync()
+            
+            print('Serial exicution')
+
             kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
             stride = 1
             # Update all events stack based on the secondaries parameters
@@ -154,7 +158,8 @@ def event(func, alg, target, event, branching=False, naive=False):
                 for j in range(mcdc['N_stack']):
                     mcdc['secondaries_counter'][i, j] = 0
                     mcdc['secondaries_idx'][i, j]     = 0
-        cuda.syncthreads
+
+        kernel.sync()
     
     def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event
@@ -226,7 +231,7 @@ def event(func, alg, target, event, branching=False, naive=False):
         wrap[N_block, N_thread](mcdc, hostco, event) #actaully running
 
 
-    return hardware_wrap
+    return hardware_wrap #we return a function that has the GPU runtime commands
 
 # =============================================================================
 # Utilities
@@ -248,3 +253,11 @@ def gpu_config(N, hostco):
     N_block = (N + (N_thread - 1)) // N_thread
 
     return N_block, N_thread
+
+
+def event_initilization(mcdc, hostco):
+    if mcdc['gpu']:
+        N_block, N_thread = gpu_config(mcdc['N_particle'], hostco)
+        kernel.initialize_stack[N_block, N_thread](mcdc, hostco)
+    else:
+        kernel.initialize_stack(mcdc, hostco)

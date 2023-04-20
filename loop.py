@@ -91,14 +91,8 @@ def EVENT_simulation(mcdc, hostco):
     # =========================================================================
     # Initialize simulation
     # =========================================================================
-    #init_stack = None
-    #if mcdc['gpu']:
-    print('Location A')
-    kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
-    #else:
-    #kernel.initialize_stack(mcdc, hostco)
-    #kernel.initialize_stack[adapter.gpu_config(mcdc['N_particle'], hostco)](mcdc, hostco)
-        
+    adapter.event_initilization(mcdc,hostco)
+
     # =========================================================================
     # Simulation loop
     # =========================================================================

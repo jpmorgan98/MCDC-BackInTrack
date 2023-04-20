@@ -109,7 +109,7 @@ def fission(P, mcdc):
     terminate_particle(P)
 
 def leakage(P, mcdc): 
-    print('in leak')
+    #print('in leak')
     if P['ux'] > 0.0:
         atomic_add(mcdc['tally'], 1, 1)
         atomic_add(mcdc['tally'], 1, 2)
@@ -224,7 +224,9 @@ def CPU_atomic_add(vec, ammount, index):
 
 sync = None
 def GPU_sync():
-        cuda.syncthreads()
+    cuda.syncthreads
+def CPU_sync():
+    x=0
 
 #@cuda.reduce
 #def GPU_reduction(mcdc, flux):
@@ -233,7 +235,7 @@ def GPU_sync():
 # ==================================
 # Utilities: event-based
 # ==================================
-
+initialize_stack = None
 def initialize_stack(mcdc, hostco):
     N_particle = mcdc['stack_'][EVENT_SOURCE]['size']
     start, stride = get_idx()
@@ -264,7 +266,7 @@ def make_kernels(alg, target):
     # ========================================
 
     global read_particle, record_particle, terminate_particle, get_idx, create,\
-           exscan, atomic_add
+           exscan, atomic_add, sync
 
     read_particle   = adapter.compiler(read_particle, target)
     record_particle = adapter.compiler(record_particle, target)
@@ -274,6 +276,8 @@ def make_kernels(alg, target):
         create  = adapter.compiler(CPU_create, target)
         exscan  = adapter.compiler(CPU_exscan, target)
         atomic_add = adapter.compiler(CPU_atomic_add, target)
+        sync       = adapter.compiler(CPU_sync, target)
+
     else:
         get_idx    = adapter.compiler(GPU_get_idx, target)
         create     = adapter.compiler(GPU_create, target)
