@@ -171,6 +171,7 @@ def record_particle(P):
     return P_rec
 
 def read_particle(P_rec):
+    #print('silly goose')
     P = create(type_.particle)
     P['x']     = P_rec['x']
     P['ux']    = P_rec['ux']
@@ -208,12 +209,8 @@ exscan = None
 def CPU_exscan(a_in, a_out, N):
     for i in range(N-1):
         a_out[i+1,:] = a_out[i,:] + a_in[i,:]
-# TODO!!!!!!!
-# perform exclusive scan 
-def GPU_exscan(a_in, a_out, N):
-    for i in range(N-1):
-        for j in range(a_in.shape[1]):
-            a_out[i+1,j] = a_out[i,j] + a_in[i,j]
+
+
 
 atomic_add = None
 def GPU_atomic_add(vec, ammount, index):
@@ -224,13 +221,23 @@ def CPU_atomic_add(vec, ammount, index):
 
 sync = None
 def GPU_sync():
-    cuda.syncthreads
+    cuda.syncthreads()
 def CPU_sync():
-    x=0
+    None
 
-#@cuda.reduce
-#def GPU_reduction(mcdc, flux):
-#    cuda.ds
+threadfence = None
+def GPU_threadfence():
+    cuda.threadfence()
+def CPU_threadfence():
+    None
+
+# TODO!!!!!!!
+# perform exclusive scan 
+#kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+def GPU_exscan(a_in, a_out, N):
+    for i in range(N-1):
+        for j in range(a_in.shape[1]):
+            a_out[i+1,j] = a_out[i,j] + a_in[i,j]
 
 # ==================================
 # Utilities: event-based
@@ -266,7 +273,7 @@ def make_kernels(alg, target):
     # ========================================
 
     global read_particle, record_particle, terminate_particle, get_idx, create,\
-           exscan, atomic_add, sync
+           exscan, atomic_add, sync, threadfence
 
     read_particle   = adapter.compiler(read_particle, target)
     record_particle = adapter.compiler(record_particle, target)
@@ -277,6 +284,7 @@ def make_kernels(alg, target):
         exscan  = adapter.compiler(CPU_exscan, target)
         atomic_add = adapter.compiler(CPU_atomic_add, target)
         sync       = adapter.compiler(CPU_sync, target)
+        threadfence = adapter.compiler(CPU_threadfence, target)
 
     else:
         get_idx    = adapter.compiler(GPU_get_idx, target)
@@ -284,6 +292,7 @@ def make_kernels(alg, target):
         exscan     = adapter.compiler(GPU_exscan, target)
         atomic_add = adapter.compiler(GPU_atomic_add, target)
         sync       = adapter.compiler(GPU_sync, target)
+        threadfence = adapter.compiler(GPU_threadfence, target)
 
     global initialize_stack
 

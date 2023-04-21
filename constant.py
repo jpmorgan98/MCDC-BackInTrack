@@ -1,3 +1,5 @@
+import numpy as np
+
 # RNG
 RNG_SEED   = 1
 RNG_STRIDE = 152917

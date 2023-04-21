@@ -83,17 +83,15 @@ def event(func, alg, target, event, branching=False, naive=False):
     def wrap_branching(mcdc, hostco, event):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
-        # print(stack)
-
         # Stack size
         N = mcdc['stack_'][stack]['size']
         start, stride = kernel.get_idx()
         for i in range(start, N, stride):
-            #cuda.syncthreads
             # Get particle index from stack
             idx = mcdc['stack_'][stack]['content'][i]
 
             # "Pop" particle from bank
+            
             P = kernel.read_particle(mcdc['bank']['content'][idx])
 
             # Set RNG seed
@@ -126,12 +124,14 @@ def event(func, alg, target, event, branching=False, naive=False):
         # Launch exclusive scan algorithm [M. Harris 2007]
         #  to get secondaries global indices
         # We are reorginizing the stack structure to optimize where particles lie in the structure
-        if (kernel.get_idx()[0] == 0):
-            kernel.sync()
 
-            print('Serial exicution')
+        # for serial behavior we have to use thread fences
+        kernel.threadfence()
+
+        if (kernel.get_idx()[0] == 0):
 
             kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+
             stride = 1
             # Update all events stack based on the secondaries parameters
             for i in range(start, N, stride):
@@ -153,13 +153,14 @@ def event(func, alg, target, event, branching=False, naive=False):
                         # Update stack sizes
                         mcdc['stack_'][j]['size'] += secondary_size
                         hostco['stack_size'][j]   += secondary_size
-                
+
                 # Reset secondaries parameters
                 for j in range(mcdc['N_stack']):
                     mcdc['secondaries_counter'][i, j] = 0
                     mcdc['secondaries_idx'][i, j]     = 0
 
-        kernel.sync()
+        # close the thread fence
+        kernel.threadfence()
     
     def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event
