@@ -131,24 +131,25 @@ def event(func, alg, target, event, branching=False, naive=False):
         if (kernel.get_idx()[0] == 0):
 
             kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
+            # close the thread fence
+
+            
+            #kernel.sync()
 
             stride = 1
             # Update all events stack based on the secondaries parameters
             for i in range(start, N, stride):
                 # Get the stack and index
                 next_stack = mcdc['secondaries_stack'][i]
-                idx        = mcdc['secondaries_idx'][i, next_stack] + \
-                            mcdc['stack_'][next_stack]['size']
+                idx        = mcdc['secondaries_idx'][i, next_stack] + mcdc['stack_'][next_stack]['size']
                             
-                mcdc['stack_'][next_stack]['content'][idx] = \
-                        mcdc['stack_'][stack]['content'][i]
+                mcdc['stack_'][next_stack]['content'][idx] = mcdc['stack_'][stack]['content'][i]
 
                 # If last particle, update stack sizes
                 if i == N-1:
                     for j in range(mcdc['N_stack']):
                         # Get secondaries size
-                        secondary_size = mcdc['secondaries_idx'][N-1,j] + \
-                                        mcdc['secondaries_counter'][N-1,j]
+                        secondary_size = mcdc['secondaries_idx'][N-1,j] + mcdc['secondaries_counter'][N-1,j]
 
                         # Update stack sizes
                         mcdc['stack_'][j]['size'] += secondary_size
@@ -159,8 +160,9 @@ def event(func, alg, target, event, branching=False, naive=False):
                     mcdc['secondaries_counter'][i, j] = 0
                     mcdc['secondaries_idx'][i, j]     = 0
 
-        # close the thread fence
         kernel.threadfence()
+
+        
     
     def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event

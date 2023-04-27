@@ -233,7 +233,6 @@ def CPU_threadfence():
 
 # TODO!!!!!!!
 # perform exclusive scan 
-#kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
 def GPU_exscan(a_in, a_out, N):
     for i in range(N-1):
         for j in range(a_in.shape[1]):
