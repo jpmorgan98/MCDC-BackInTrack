@@ -90,5 +90,6 @@ def make_type_global(N_particle, N_stack, alg):
     # Bool-typed (TODO: report bug)
     struct += [('history_based', bool_), ('gpu', bool_), 
                ('branchless_collision', bool_)]
-    
+
+
     global_ = np.dtype(struct)
