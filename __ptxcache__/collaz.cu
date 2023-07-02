@@ -1,16 +1,9 @@
-
-struct sneaky {
-	MCDCContext* mcdc_context;
-	MyContext*   my_context;
-};
-
-
 __device__ void* preamble(void* ptr) {
-	void** offset_ptr = (void**)ptr;
-	return offset_ptr[-1];
+	return ((void**)ptr)[-1];
 }
-struct _88b8 { unsigned long long int data[11]; };
+struct _104b8 { unsigned long long int data[13]; };
 struct _16b8 { unsigned long long int data[2]; };
+struct _0b8 { unsigned long long int data[0]; };
 extern "C" __device__ int _initialize(void*, void* prog);
 extern "C" __device__ int _finalize  (void*, void* prog);
 extern "C" __device__ int _make_work (bool* result, void* prog);
@@ -43,9 +36,9 @@ struct collaz{
 	static const size_t FRAME_SIZE = 8192;
 	static const size_t POOL_SIZE = 8192;
 	typedef OpUnion<Odd,Even> OpSet;
-	typedef _88b8* DeviceState;
-	typedef int32_t GroupState;
-	typedef int16_t ThreadState;
+	typedef _104b8* DeviceState;
+	typedef _0b8* GroupState;
+	typedef _0b8* ThreadState;
 	template<typename PROGRAM>
 	__device__ static void initialize(PROGRAM prog) {
 		int  dummy_void_result = 0;
@@ -189,5 +182,77 @@ int collaz_evt_even_sync(void*, void* fn_param_1, void* fn_param_2){
 	printf("<pre%p>",preamble(fn_param_1));
 	void* prog = preamble(fn_param_1);
 	((collaz_evt*)prog)->template sync<Even>(*(_16b8*)fn_param_2);
+	return 0;
+}
+extern "C" __device__ 
+int collaz_hrm_device(void* result, void* prog){
+	printf("{ device accessor }");
+	(*(void**)result) = ((collaz_hrm*)prog)->device;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_hrm_group(void* result, void* prog){
+	printf("{ group accessor }");
+	(*(void**)result) = ((collaz_hrm*)prog)->group;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_hrm_thread(void* result, void* prog){
+	printf("{ thread accessor }");
+	(*(void**)result) = ((collaz_hrm*)prog)->thread;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_hrm__dev_ctx(void* result, void* prog){
+	printf("{ _dev_ctx accessor }");
+	(*(void**)result) = &((collaz_hrm*)prog)->_dev_ctx;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_hrm__grp_ctx(void* result, void* prog){
+	printf("{ _grp_ctx accessor }");
+	(*(void**)result) = &((collaz_hrm*)prog)->_grp_ctx;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_hrm__thd_ctx(void* result, void* prog){
+	printf("{ _thd_ctx accessor }");
+	(*(void**)result) = &((collaz_hrm*)prog)->_thd_ctx;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_evt_device(void* result, void* prog){
+	printf("{ device accessor }");
+	(*(void**)result) = ((collaz_evt*)prog)->device;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_evt_group(void* result, void* prog){
+	printf("{ group accessor }");
+	(*(void**)result) = ((collaz_evt*)prog)->group;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_evt_thread(void* result, void* prog){
+	printf("{ thread accessor }");
+	(*(void**)result) = ((collaz_evt*)prog)->thread;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_evt__dev_ctx(void* result, void* prog){
+	printf("{ _dev_ctx accessor }");
+	(*(void**)result) = &((collaz_evt*)prog)->_dev_ctx;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_evt__grp_ctx(void* result, void* prog){
+	printf("{ _grp_ctx accessor }");
+	(*(void**)result) = &((collaz_evt*)prog)->_grp_ctx;
+	return 0;
+}
+extern "C" __device__ 
+int collaz_evt__thd_ctx(void* result, void* prog){
+	printf("{ _thd_ctx accessor }");
+	(*(void**)result) = &((collaz_evt*)prog)->_thd_ctx;
 	return 0;
 }

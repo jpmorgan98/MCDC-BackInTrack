@@ -1,7 +1,7 @@
 .version	7.3	.target	sm_86	.address_size	64	.extern	.func(.param	.b32	func_retval0)collaz_hrm_even_async(.param	.b64	collaz_hrm_even_async_param_0,	.param	.b64	collaz_hrm_even_async_param_1,	.param	.b64	collaz_hrm_even_async_param_2);
 .extern	.func(.param	.b32	func_retval0)collaz_hrm_odd_async(.param	.b64	collaz_hrm_odd_async_param_0,	.param	.b64	collaz_hrm_odd_async_param_1,	.param	.b64	collaz_hrm_odd_async_param_2);
-.common	.global	.align	8	.u64	_ZN08NumbaEnv8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE;
- .visible	.func(.param	.b32	func_retval0)_even(.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE_param_0,	.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE_param_1,	.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE_param_2){
+.common	.global	.align	8	.u64	_ZN08NumbaEnv8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE;
+ .visible	.func(.param	.b32	func_retval0)_even(.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE_param_0,	.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE_param_1,	.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE_param_2){
 	.local	.align	8	.b8	__local_depot0[16];
 	.reg	.b64	%SP;
 	.reg	.b64	%SPL;
@@ -11,9 +11,9 @@
 	.reg	.b64	%rd<42>;
 	mov.u64	%SPL,	__local_depot0;
 	cvta.local.u64	%SP,	%SPL;
-	ld.param.u64	%rd4,	[_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE_param_0];
-	ld.param.u64	%rd5,	[_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE_param_1];
-	ld.param.u64	%rd6,	[_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi441EE_param_2];
+	ld.param.u64	%rd4,	[_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE_param_0];
+	ld.param.u64	%rd5,	[_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE_param_1];
+	ld.param.u64	%rd6,	[_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAE6RecordILi440EE6RecordILi442EE_param_2];
 	add.u64	%rd7,	%SP,	0;
 	add.u64	%rd1,	%SPL,	0;
 	mov.u64	%rd8,	0;
@@ -49,9 +49,9 @@
 	ld.s8	%rd25,	[%rd6+11];
 	bfi.b64	%rd26,	%rd25,	%rd24,	8,	56;
 	bfi.b64	%rd27,	%rd26,	%rd23,	16,	48;
-	st.u64[%rd20+8],	%rd27;
+	st.u64[%rd20+16],	%rd27;
 	$L__BB0_2:
-	add.s64	%rd28,	%rd5,	8;
+	add.s64	%rd28,	%rd5,	16;
 	atom.add.u64	%rd29,	[%rd28],	1;
 	ld.u8	%r12,	[%rd6+8];
 	ld.u8	%r13,	[%rd6+9];

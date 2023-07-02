@@ -1042,15 +1042,6 @@ class RuntimeSpec():
             type_defs += record_to_struct(kind,name,self.type_map)
 
 
-        max_size = 0
-        for func in self.async_fns:
-            param_list  = fn_arg_ano_list(func)
-            if len(param_list) < 1:
-                continue
-            print(param_list)
-            param_list = [ (str(idx),ptype) for idx,ptype in enumerate(param_list[1:]) ]
-            param_struct = numba.from_dtype(np.dtype(param_list))
-            max_size = max(max_size,param_struct.size)
         
         param_specs = {}
         for func in self.async_fns:
@@ -1060,7 +1051,15 @@ class RuntimeSpec():
                     align     = alignment(kind)
                     param_specs[(size,align)] = ()
         
-        param_decls = "struct ProgBundle { void* dev_ctx; void* hrm_prog; };\n"
+        state_kinds = [self.dev_state, self.grp_state, self.thd_state]
+        for kind in state_kinds:
+                if isinstance(kind,numba.types.Record):
+                    size      = kind.size
+                    align     = alignment(kind)
+                    param_specs[(size,align)] = ()
+            
+
+        param_decls = "" 
         element_map = {
             1 : "unsigned char",
             2 : "unsigned short int",
@@ -1077,7 +1076,7 @@ class RuntimeSpec():
 
         #union_struct = numba.from_dtype(np.dtype([ ('buffer',np.dtype((np.uint64,union_size))) ]))
 
-        proto_decls = ""                                                       \
+        proto_decls = ""                                                             \
             + "extern \"C\" __device__ int _initialize(void*, void* prog);\n"        \
             + "extern \"C\" __device__ int _finalize  (void*, void* prog);\n"        \
             + "extern \"C\" __device__ int _make_work (bool* result, void* prog);\n"
@@ -1121,8 +1120,8 @@ class RuntimeSpec():
 
         # The definition of the device, group, and thread states
         state_defs = "\ttypedef "+map_type_name(self.type_map,self.dev_state,rec_mode="ptr")+" DeviceState;\n" \
-                   + "\ttypedef "+map_type_name(self.type_map,self.grp_state)+" GroupState;\n"  \
-                   + "\ttypedef "+map_type_name(self.type_map,self.thd_state)+" ThreadState;\n"
+                   + "\ttypedef "+map_type_name(self.type_map,self.grp_state,rec_mode="ptr")+" GroupState;\n"  \
+                   + "\ttypedef "+map_type_name(self.type_map,self.thd_state,rec_mode="ptr")+" ThreadState;\n"
 
         # The base function definitions
         spec_def = "struct " + self.spec_name + "{\n"                                                     \
@@ -1137,7 +1136,7 @@ class RuntimeSpec():
 
         preamble = ""                              \
         "__device__ void* preamble(void* ptr) {\n"\
-        "\treturn ((ProgBundle*)ptr);\n"               \
+        "\treturn ((void**)ptr)[-1];\n"               \
         "}\n"
 
 
@@ -1183,14 +1182,30 @@ class RuntimeSpec():
         "\treturn 0;\n"                                                     \
         "}}\n"
 
+        accessor_template = ""                                              \
+        "extern \"C\" __device__ \n"                                        \
+        "int {short_name}_{field}(void* result, void* prog){{\n"            \
+        "\tprintf(\"{{ {field} accessor }}\");\n"                              \
+        "\t(*(void**)result) = {prefix}(({short_name}*)prog)->{field};\n"   \
+        "\treturn 0;\n"                                                     \
+        "}}\n"
+
+        program_fields = [
+            (  "device", ""), (   "group", ""), (  "thread", ""),
+            ("_dev_ctx","&"), ("_grp_ctx","&"), ("_thd_ctx","&")
+        ]
+
         # Generate specializations and init/exec trampolines for each
         # program type defined by harmonize
         dispatch_defs = ""
+        accessor_defs = ""
         for kind, short_kind in [("Harmonize","hrm"), ("Event","evt")]:
             short_name = self.spec_name.lower()+"_"+short_kind
             dispatch_defs += spec_decl_template.format(kind=kind,name=self.spec_name,short_name=short_name)
             dispatch_defs += init_template.format(short_name=short_name,name=self.spec_name,kind=kind)
             dispatch_defs += exec_template.format(short_name=short_name,name=self.spec_name,kind=kind)
+            for (field,prefix) in program_fields:
+                accessor_defs += accessor_template.format(short_name=short_name,field=field,prefix=prefix)
             # Generate the dispatch functions for each async function
             for fn in self.async_fns:
                 param_text = func_param_text(func,self.type_map,rec_mode="void_ptr",prior=True,clip=0,first_void=True)
@@ -1206,7 +1221,7 @@ class RuntimeSpec():
                     )
 
 
-        return preamble + type_defs + param_decls + proto_decls + async_defs + spec_def + dispatch_defs
+        return preamble + type_defs + param_decls + proto_decls + async_defs + spec_def + dispatch_defs + accessor_defs
 
 
     def generate_code(self):
@@ -1330,8 +1345,9 @@ class RuntimeSpec():
 
 
 val_count = 10
-dev_state_type = numba.from_dtype(np.dtype([ ('val',np.dtype((np.uintp,val_count+1))) ]))
-
+dev_state_type = numba.from_dtype(np.dtype([ ('before', np.uint64), ('val',np.dtype((np.uintp,val_count+1))), ('extra',np.uint32)]))
+grp_state_type = numba.from_dtype(np.dtype([ ]))
+thd_state_type = numba.from_dtype(np.dtype([ ]))
 
 
 collaz_iter_dtype = np.dtype([('value',np.int32), ('start',np.int32), ('steps',np.int32)])
@@ -1358,7 +1374,18 @@ def even(state: dev_state_type, iter: collaz_iter):
         iter['value'] = iter['value'] * 3 + 1
         async_odd(state,iter)
 
-def odd(state: dev_state_type, iter: collaz_iter):
+@numba.jit(nopython=True)
+def immediate_return(param: dev_state_type) -> numba.types.voidptr:
+    result : numba.types.voidptr = param
+    return result
+
+@numba.jit(nopython=True)
+def from_void(param: dev_state_type) -> numba.types.voidptr:
+    result : numba.types.voidptr = param
+    return result
+
+def odd(prog: dev_state_type, iter: collaz_iter):
+    state : dev_state_type = prog
     numba.cuda.atomic.add(state['val'],1,1)
     iter['steps'] += 1
     if iter['value'] % 2 == 0:
@@ -1393,7 +1420,7 @@ def make_work(state: dev_state_type) -> numba.boolean:
 
 
 base_fns   = (initialize,finalize,make_work)
-state_spec = (dev_state_type,np.int32,np.int16) 
+state_spec = (dev_state_type,grp_state_type,thd_state_type) 
 async_fns  = [odd,even]
 
 collaz_spec = RuntimeSpec("collaz",state_spec,base_fns,async_fns)
