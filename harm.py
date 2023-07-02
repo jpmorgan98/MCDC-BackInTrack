@@ -626,6 +626,7 @@ def inlined_device_ptx( func, function_map, type_map ):
 
 
 def map_type_to_np(kind):
+    return numba.np.numpy_support.as_dtype(kind)
     primitives = {
         numba.none    : np.void,
         bool          : np.bool8,
@@ -781,15 +782,16 @@ def harm_template_func(func,template_name,function_map,type_map,inline,base=Fals
         code += "\t\tint *fn_param_0 = &dummy_void_result;\n"
 
 
-    code += "\tprintf(\"{"+func.__name__+"}\");\n"
-    #code += "\t//printf(\"{ctx%p}\",&prog._dev_ctx);\n"
-    #code += "\t//printf(\"{sta%p}\",prog.device);\n"
+    #code += "\tprintf(\"{"+func.__name__+"}\");\n"
+    #code += "\tprintf(\"(prog%p)\",&prog);\n"
+    #code += "\tprintf(\"{ctx%p}\",&prog._dev_ctx);\n"
+    #code += "\tprintf(\"(sta%p)\",prog.device);\n"
     #code += "\t//printf(\"{pre%p}\",preamble(prog.device));\n"
 
     if inline:
         code += inlined_device_ptx(func,function_map,type_map)
     else:
-        code += "\t\t_"+func.__name__+"(fn_param_0, &prog.device"+arg_text+");\n"
+        code += "\t\t_"+func.__name__+"(fn_param_0, &prog"+arg_text+");\n"
 
     if return_type != "void":
         code += "\t\treturn result;\n"
@@ -1134,10 +1136,10 @@ class RuntimeSpec():
         # String template to alias the appropriate specialization to a convenient name
         spec_decl_template = "typedef {kind}Program<{name}> {short_name};\n"
 
-        preamble = ""                              \
-        "__device__ void* preamble(void* ptr) {\n"\
-        "\treturn ((void**)ptr)[-1];\n"               \
-        "}\n"
+        preamble = ""#                              \
+        #"__device__ void* preamble(void* ptr) {\n"\
+        #"\treturn ((void**)ptr)[-1];\n"               \
+        #"}\n"
 
 
         # String template for the program initialization trampoline
@@ -1148,8 +1150,8 @@ class RuntimeSpec():
         "\tvoid *device_arg\n"                                          \
         ") {{\n"                                                        \
         "\tauto _dev_ctx = (typename {short_name}::DeviceContext*) _dev_ctx_arg;\n" \
-        "\tauto device   = (typename {short_name}::DeviceState*) device_arg;\n"     \
-        "\t_inner_dev_init<{short_name}>(*_dev_ctx,*device);\n"         \
+        "\tauto device   = (typename {short_name}::DeviceState) device_arg;\n"     \
+        "\t_inner_dev_init<{short_name}>(*_dev_ctx,device);\n"         \
         "\treturn 0;\n"                                                 \
         "}}\n"
 
@@ -1163,32 +1165,30 @@ class RuntimeSpec():
         "\tsize_t  cycle_count\n"                                       \
         ") {{\n"                                                        \
         "\tauto _dev_ctx = (typename {short_name}::DeviceContext*) _dev_ctx_arg;\n" \
-        "\tauto device   = (typename {short_name}::DeviceState*) device_arg;\n"     \
-        "\tprintf(\"<ctx%p>\",_dev_ctx);\n"\
-        "\tprintf(\"<sta%p>\",device);\n"\
-        "\tprintf(\"<pre%p>\",preamble(device));\n"\
-        "\t_inner_dev_exec<{short_name}>(*_dev_ctx,*device,cycle_count);\n"         \
+        "\tauto device   = (typename {short_name}::DeviceState) device_arg;\n"     \
+        "\t_inner_dev_exec<{short_name}>(*_dev_ctx,device,cycle_count);\n"         \
         "\treturn 0;\n"                                                 \
         "}}\n"
+        #"\tprintf(\"<ctx%p>\",_dev_ctx);\n"\
+        #"\tprintf(\"<sta%p>\",device);\n"\
 
         dispatch_template = ""                                              \
         "extern \"C\" __device__ \n"                                        \
         "int {short_name}_{fn}_{kind}(void*{params}){{\n"                   \
-        "\tprintf(\"{{ {fn} trampoline }}\");\n"                            \
-        "\tprintf(\"<sta%p>\",fn_param_1);\n"\
-        "\tprintf(\"<pre%p>\",preamble(fn_param_1));\n"\
-        "\tvoid* prog = preamble(fn_param_1);\n"                            \
-        "\t(({short_name}*)prog)->template {kind}<{fn_type}>({args});\n"  \
+        "\t(({short_name}*)fn_param_1)->template {kind}<{fn_type}>({args});\n"  \
         "\treturn 0;\n"                                                     \
         "}}\n"
+        #"\tprintf(\"{{ {fn} trampoline }}\");\n"                            \
 
         accessor_template = ""                                              \
         "extern \"C\" __device__ \n"                                        \
         "int {short_name}_{field}(void* result, void* prog){{\n"            \
-        "\tprintf(\"{{ {field} accessor }}\");\n"                              \
         "\t(*(void**)result) = {prefix}(({short_name}*)prog)->{field};\n"   \
         "\treturn 0;\n"                                                     \
         "}}\n"
+        #"\tprintf(\"{{ {field} accessor }}\");\n"                              \
+        #"\tprintf(\"{{prog %p}}\",prog);\n"                              \
+        #"\tprintf(\"{{field%p}}\",*(void**)result);\n"                              \
 
         program_fields = [
             (  "device", ""), (   "group", ""), (  "thread", ""),
@@ -1344,7 +1344,7 @@ class RuntimeSpec():
 
 
 
-val_count = 10
+val_count = 1024
 dev_state_type = numba.from_dtype(np.dtype([ ('before', np.uint64), ('val',np.dtype((np.uintp,val_count+1))), ('extra',np.uint32)]))
 grp_state_type = numba.from_dtype(np.dtype([ ]))
 thd_state_type = numba.from_dtype(np.dtype([ ]))
@@ -1353,26 +1353,23 @@ thd_state_type = numba.from_dtype(np.dtype([ ]))
 collaz_iter_dtype = np.dtype([('value',np.int32), ('start',np.int32), ('steps',np.int32)])
 collaz_iter = numba.from_dtype(collaz_iter_dtype)
 
-sig = numba.types.void(
-    dev_state_type,
-    collaz_iter
-)
+sig = numba.types.void(numba.uintp,collaz_iter)
+
+dev_sig = dev_state_type(numba.uintp)
 
 async_even = cuda.declare_device('collaz_hrm_even_async', sig)
 async_odd  = cuda.declare_device('collaz_hrm_odd_async' , sig)
+device     = cuda.declare_device('collaz_hrm_device' , dev_sig)
 
 
-def even(state: dev_state_type, iter: collaz_iter):
-    if iter['value'] == 0:
-        state['val'][1+iter['start']] = iter['steps']
-    numba.cuda.atomic.add(state['val'],1,1)
+def even(prog: numba.uintp, iter: collaz_iter):
+    #numba.cuda.atomic.max(device(prog)['val'],iter['start'],iter['value'])
     iter['steps'] += 1
+    iter['value'] /= 2
     if iter['value'] % 2 == 0:
-        iter['value'] /= 2
-        async_even(state,iter)
+        async_even(prog,iter)
     else :
-        iter['value'] = iter['value'] * 3 + 1
-        async_odd(state,iter)
+        async_odd(prog,iter)
 
 @numba.jit(nopython=True)
 def immediate_return(param: dev_state_type) -> numba.types.voidptr:
@@ -1384,38 +1381,42 @@ def from_void(param: dev_state_type) -> numba.types.voidptr:
     result : numba.types.voidptr = param
     return result
 
-def odd(prog: dev_state_type, iter: collaz_iter):
-    state : dev_state_type = prog
-    numba.cuda.atomic.add(state['val'],1,1)
-    iter['steps'] += 1
-    if iter['value'] % 2 == 0:
-        iter['value'] /= 2
-        async_even(state,iter)
-    else :
+def odd(prog: numba.uintp, iter: collaz_iter):
+    #numba.cuda.atomic.add(device(prog)['val'],iter['start'],1)
+    #numba.cuda.atomic.max(device(prog)['val'],iter['start'],iter['steps'])
+    
+    if iter['value'] <= 1:
+        device(prog)['val'][1+iter['start']] = iter['steps']
+    else:
         iter['value'] = iter['value'] * 3 + 1
-        async_odd(state,iter)
+        iter['steps'] += 1
+        if iter['value'] % 2 == 0:
+            async_even(prog,iter)
+        else :
+            async_odd(prog,iter)
 
 
-def initialize(state: dev_state_type):
+def initialize(prog: numba.uintp):
     pass
 
-def finalize(state: dev_state_type):
+def finalize(prog: numba.uintp):
     pass
 
-def make_work(state: dev_state_type) -> numba.boolean:
-    old = numba.cuda.atomic.add(state['val'],0,1)
+def make_work(prog: numba.uintp) -> numba.boolean:
+    old = numba.cuda.atomic.add(device(prog)['val'],0,1)
     if old >= val_count:
         return False
 
-    #numba.cuda.atomic.add(state['val'],1+old,1)
+    #numba.cuda.atomic.add(device(prog)['val'],1+old,old)
     iter = numba.cuda.local.array(1,collaz_iter)
     iter[0]['value'] = old
     iter[0]['start'] = old
+    iter[0]['steps'] = 0
 
     if old % 2 == 0:
-        async_even(state,iter[0])
+        async_even(prog,iter[0])
     else:
-        async_odd (state,iter[0])
+        async_odd (prog,iter[0])
     return True
 
 
@@ -1427,12 +1428,30 @@ collaz_spec = RuntimeSpec("collaz",state_spec,base_fns,async_fns)
 
 collaz_rt = collaz_spec.instance()
 
-collaz_rt.init()
+collaz_rt.init(1024)
 
-collaz_rt.exec(1024)
+collaz_rt.exec(6553)
 
 state = collaz_rt.load_state()
 print(state)
+
+def collaz_check(value):
+    step = 0
+    while value > 1:
+        step += 1
+        if value % 2 == 0:
+            value /= 2
+        else :
+            value = value * 3 + 1
+    return step
+
+total = 0
+for val in range(val_count):
+    steps = collaz_check(val)
+    total += steps
+    print(steps,end=", ")
+print("")
+print(f"Total: {total}")
 
 exit(0)
 
