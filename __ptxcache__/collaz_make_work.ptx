@@ -1,6 +1,6 @@
-.version	7.3	.target	sm_86	.address_size	64	.extern	.func(.param	.b32	func_retval0)collaz_hrm_device(.param	.b64	collaz_hrm_device_param_0,	.param	.b64	collaz_hrm_device_param_1);
-.extern	.func(.param	.b32	func_retval0)collaz_hrm_even_async(.param	.b64	collaz_hrm_even_async_param_0,	.param	.b64	collaz_hrm_even_async_param_1,	.param	.b64	collaz_hrm_even_async_param_2);
-.extern	.func(.param	.b32	func_retval0)collaz_hrm_odd_async(.param	.b64	collaz_hrm_odd_async_param_0,	.param	.b64	collaz_hrm_odd_async_param_1,	.param	.b64	collaz_hrm_odd_async_param_2);
+.version	7.3	.target	sm_86	.address_size	64	.extern	.func(.param	.b32	func_retval0)access_device(.param	.b64	access_device_param_0,	.param	.b64	access_device_param_1);
+.extern	.func(.param	.b32	func_retval0)dispatch_even_async(.param	.b64	dispatch_even_async_param_0,	.param	.b64	dispatch_even_async_param_1,	.param	.b64	dispatch_even_async_param_2);
+.extern	.func(.param	.b32	func_retval0)dispatch_odd_async(.param	.b64	dispatch_odd_async_param_0,	.param	.b64	dispatch_odd_async_param_1,	.param	.b64	dispatch_odd_async_param_2);
 .common	.global	.align	8	.u64	_ZN08NumbaEnv8__main__9make_workB2v3B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy;
  .visible	.func(.param	.b32	func_retval0)_make_work(.param	.b64	_ZN8__main__9make_workB2v3B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy_param_0,	.param	.b64	_ZN8__main__9make_workB2v3B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy_param_1){
 	.local	.align	8	.b8	__local_depot0[40];
@@ -42,7 +42,7 @@
 		.param	.b64	param1;
 		st.param.b64[param1+0],	%rd7;
 		.param	.b32	retval0;
-		call(retval0),	collaz_hrm_device,	(param0,	param1);
+		call(retval0),	access_device,	(param0,	param1);
 		ld.param.b32	%r9,	[retval0+0];
 		
 	}
@@ -54,7 +54,7 @@
 	ld.local.u64	%rd14,	[%rd1];
 	add.s64	%rd15,	%rd14,	8;
 	atom.add.u64	%rd5,	[%rd15],	1;
-	setp.gt.u64	%p3,	%rd5,	1023;
+	setp.gt.u64	%p3,	%rd5,	9;
 	@%p3	bra	$L__BB0_10;
 	bra.uni	$L__BB0_3;
 	$L__BB0_10:
@@ -88,7 +88,7 @@
 		.param	.b64	param2;
 		st.param.b64[param2+0],	%rd9;
 		.param	.b32	retval0;
-		call(retval0),	collaz_hrm_odd_async,	(param0,	param1,	param2);
+		call(retval0),	dispatch_odd_async,	(param0,	param1,	param2);
 		ld.param.b32	%r9,	[retval0+0];
 		
 	}
@@ -109,7 +109,7 @@
 		.param	.b64	param2;
 		st.param.b64[param2+0],	%rd9;
 		.param	.b32	retval0;
-		call(retval0),	collaz_hrm_even_async,	(param0,	param1,	param2);
+		call(retval0),	dispatch_even_async,	(param0,	param1,	param2);
 		ld.param.b32	%r9,	[retval0+0];
 		
 	}
