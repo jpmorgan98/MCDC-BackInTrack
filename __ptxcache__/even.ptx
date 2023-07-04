@@ -1,5 +1,5 @@
-.version	7.3	.target	sm_86	.address_size	64	.extern	.func(.param	.b32	func_retval0)collaz_hrm_even_async(.param	.b64	collaz_hrm_even_async_param_0,	.param	.b64	collaz_hrm_even_async_param_1,	.param	.b64	collaz_hrm_even_async_param_2);
-.extern	.func(.param	.b32	func_retval0)collaz_hrm_odd_async(.param	.b64	collaz_hrm_odd_async_param_0,	.param	.b64	collaz_hrm_odd_async_param_1,	.param	.b64	collaz_hrm_odd_async_param_2);
+.version	7.3	.target	sm_86	.address_size	64	.extern	.func(.param	.b32	func_retval0)dispatch_even_async(.param	.b64	dispatch_even_async_param_0,	.param	.b64	dispatch_even_async_param_1,	.param	.b64	dispatch_even_async_param_2);
+.extern	.func(.param	.b32	func_retval0)dispatch_odd_async(.param	.b64	dispatch_odd_async_param_0,	.param	.b64	dispatch_odd_async_param_1,	.param	.b64	dispatch_odd_async_param_2);
 .common	.global	.align	8	.u64	_ZN08NumbaEnv8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy6RecordILi442EE;
  .visible	.func(.param	.b32	func_retval0)_even(.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy6RecordILi442EE_param_0,	.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy6RecordILi442EE_param_1,	.param	.b64	_ZN8__main__4evenB2v5B96cw51cXTLSUwHBinCqbbgUAAGBlq82ILSCEQYkgSQBFCjFSaBZJtttTo4sahbKUBDUB3kNVDaQRKChQ_2bSEFA_2fkGdcqwkAEy6RecordILi442EE_param_2){
 	.local	.align	8	.b8	__local_depot0[16];
@@ -74,7 +74,7 @@
 		.param	.b64	param2;
 		st.param.b64[param2+0],	%rd5;
 		.param	.b32	retval0;
-		call(retval0),	collaz_hrm_odd_async,	(param0,	param1,	param2);
+		call(retval0),	dispatch_odd_async,	(param0,	param1,	param2);
 		ld.param.b32	%r27,	[retval0+0];
 		
 	}
@@ -95,7 +95,7 @@
 		.param	.b64	param2;
 		st.param.b64[param2+0],	%rd5;
 		.param	.b32	retval0;
-		call(retval0),	collaz_hrm_even_async,	(param0,	param1,	param2);
+		call(retval0),	dispatch_even_async,	(param0,	param1,	param2);
 		ld.param.b32	%r27,	[retval0+0];
 		
 	}

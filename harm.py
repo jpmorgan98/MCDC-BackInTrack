@@ -9,6 +9,15 @@ import type_
 import subprocess
 
 import uuid
+import inspect 
+import sys
+
+
+def inject_global(name,value,index):
+    frm = inspect.stack()[index+1]
+    mod = inspect.getmodule(frm[0])
+    setattr(sys.modules[mod.__name__], name, value)
+    print(f"Defined '{name}' as "+str(value)+" for module "+mod.__name__)
 
 
 def fn_arg_ano_list( func ):
@@ -17,6 +26,22 @@ def fn_arg_ano_list( func ):
         if( arg != 'return' ):
             result.append(ano)
     return result
+
+def fn_sig( func ):
+    arg_list = []
+    ret    = numba.types.void
+    for arg,ano in func.__annotations__.items():
+        if( arg != 'return' ):
+            arg_list.append(ano)
+        else:
+            ret = ano
+    return ret(*arg_list)
+
+
+def asyn( func ):
+    sig = fn_sig(func)
+    return cuda.declare_device('dispatch_'+func.__name__+'_async', sig)
+
 
 def fn_arg_ano( func ):
     return tuple( x for x in fn_arg_ano_list(func) )
@@ -549,25 +574,15 @@ def extern_device_ptx( func, type_map ):
     arg_types   = fn_arg_ano_list(func)
     ptx_text, res_type = device_ptx(func)
     ptx_text = strip_ptx(ptx_text,False)
-    print("ptx_text: "+ptx_text)
     parse_tree = parse_ptx(ptx_text)
     line_tree  = linify_tree(parse_tree)
-    if func.__name__ == 'make_work':
-        print("parse_tree: "+str(parse_tree))
-        print("line_tree: "+str(line_tree))
     extern_regex = r'(?P<before>\.visible\s+\.func\s*\(\s*\.param\s+\.\w+\s+\w+\s*\)\s*)(?P<name>\w+)(?P<after>\((?P<params>(\s*\.param\s+\.\w+\s+\w+\s*)(,\s*.param\s+\.\w+\s+\w+\s*)*)\))'
     for match, index, context in extract_regex(line_tree,extern_regex):
         before = match['before']
         after  = match['after']
-        #ptx_text = before + "_" + func.__name__ + after
         context[index] = before + "_" + func.__name__ + after
-        print("after: "+context[index])
-    print("revised: "+str(line_tree))
     ptx_text = stringify_tree(line_tree,False)
-    print(ptx_text)
     ptx_text = ptx_text.replace("call.uni","call")
-    #if func.__name__ == 'make_work':
-        #exit(1)
     return ptx_text
     
     
@@ -1027,7 +1042,7 @@ class RuntimeSpec():
 
 
 
-    def generate_harm_code(
+    def generate_specification_code(
             self,
             # Whether or not the async functions should be inlined through ptx
             # (currently, this feature is NOT supported)
@@ -1037,15 +1052,16 @@ class RuntimeSpec():
 
         # Accumulator for type definitions
         type_defs = ""
-
         # Convert each record type in the type map into a string defining
         # an equivalent C struct.
         for kind, name in self.type_map.items():
             type_defs += record_to_struct(kind,name,self.type_map)
 
 
-        
+        # A map to store the set of parameter size/alignment specifications
         param_specs = {}
+
+        # Add in parameter specs from the basic async functions
         for func in self.async_fns:
             for kind in fn_arg_ano_list(func):
                 if isinstance(kind,numba.types.Record):
@@ -1053,6 +1069,7 @@ class RuntimeSpec():
                     align     = alignment(kind)
                     param_specs[(size,align)] = ()
         
+        # Add in parameter specs from the required async functions
         state_kinds = [self.dev_state, self.grp_state, self.thd_state]
         for kind in state_kinds:
                 if isinstance(kind,numba.types.Record):
@@ -1061,13 +1078,19 @@ class RuntimeSpec():
                     param_specs[(size,align)] = ()
             
 
+        # An accumulator for parameter type declarations
         param_decls = "" 
+
+        # A map from alignment sizes to their corresponding element type
         element_map = {
             1 : "unsigned char",
             2 : "unsigned short int",
             4 : "unsigned int",
             8 : "unsigned long long int"
         }
+
+        # Create types matching the required size and alignment. Until reliable alignment
+        # deduction is implemented, an alignment of 8 will always be used.
         for size, align in param_specs.keys():
             align = 8
             count =  (size + (align-1)) // align
@@ -1076,13 +1099,15 @@ class RuntimeSpec():
                         +" { "+element_map[align]+" data["+str(count)+"]; };\n"   
 
 
-        #union_struct = numba.from_dtype(np.dtype([ ('buffer',np.dtype((np.uint64,union_size))) ]))
 
+        # Accumulator for prototypes of extern definitions of async functions, initialized
+        # with prototypes corresponding to the required async functions
         proto_decls = ""                                                             \
             + "extern \"C\" __device__ int _initialize(void*, void* prog);\n"        \
             + "extern \"C\" __device__ int _finalize  (void*, void* prog);\n"        \
             + "extern \"C\" __device__ int _make_work (bool* result, void* prog);\n"
         
+        # Generate and accumulate prototypes for other async function definitons
         for func in self.async_fns:
             param_text = func_param_text(func,self.type_map,rec_mode="void_ptr",prior=True,clip=0,first_void=True)
             return_type = "void"
@@ -1102,7 +1127,7 @@ class RuntimeSpec():
         # for each async function provided, either attempting to inline the
         # function definition (this currently does not work), or inserting
         # a call to a matching extern function, allowing the scheduling
-        # program to trampoline to the appropriate logic
+        # program to jump to the appropriate logic
         for func in self.async_fns:
             async_defs += harm_async_func(func,self.function_map,self.type_map,inline)
 
@@ -1133,18 +1158,17 @@ class RuntimeSpec():
                  + harm_template_func(self.source_fn,"make_work" ,self.function_map,self.type_map,inline,True) \
                  + "};\n"
 
+        return type_defs + param_decls + proto_decls + async_defs + spec_def
+
+
+
+    def generate_specialization_code(self,kind,shorthand):
         # String template to alias the appropriate specialization to a convenient name
         spec_decl_template = "typedef {kind}Program<{name}> {short_name};\n"
 
-        preamble = ""#                              \
-        #"__device__ void* preamble(void* ptr) {\n"\
-        #"\treturn ((void**)ptr)[-1];\n"               \
-        #"}\n"
-
-
-        # String template for the program initialization trampoline
+        # String template for the program initialization wrapper
         init_template = ""                                              \
-        "extern \"C\" __device__ int init_{short_name}(\n"              \
+        "extern \"C\" __device__ int init_program(\n"                    \
         "\tvoid*,\n"                                                    \
         "\tvoid *_dev_ctx_arg,\n"                                       \
         "\tvoid *device_arg\n"                                          \
@@ -1155,10 +1179,10 @@ class RuntimeSpec():
         "\treturn 0;\n"                                                 \
         "}}\n"
 
-        # String template for the program initialization trampoline
+        # String template for the program execution wrapper
         exec_template = ""                                              \
         "extern \"C\" __device__ "                                      \
-        "int exec_{short_name}(\n"                                      \
+        "int exec_program(\n"                                           \
         "\tvoid*,\n"                                                    \
         "\tvoid   *_dev_ctx_arg,\n"                                     \
         "\tvoid   *device_arg,\n"                                       \
@@ -1172,17 +1196,21 @@ class RuntimeSpec():
         #"\tprintf(\"<ctx%p>\",_dev_ctx);\n"\
         #"\tprintf(\"<sta%p>\",device);\n"\
 
+
+        # String template for async function dispatches
         dispatch_template = ""                                              \
         "extern \"C\" __device__ \n"                                        \
-        "int {short_name}_{fn}_{kind}(void*{params}){{\n"                   \
+        "int dispatch_{fn}_{kind}(void*{params}){{\n"                       \
         "\t(({short_name}*)fn_param_1)->template {kind}<{fn_type}>({args});\n"  \
         "\treturn 0;\n"                                                     \
         "}}\n"
-        #"\tprintf(\"{{ {fn} trampoline }}\");\n"                            \
+        #"\tprintf(\"{{ {fn} wrapper }}\");\n"                            \
 
+
+        # String template for field accessors
         accessor_template = ""                                              \
         "extern \"C\" __device__ \n"                                        \
-        "int {short_name}_{field}(void* result, void* prog){{\n"            \
+        "int access_{field}(void* result, void* prog){{\n"                  \
         "\t(*(void**)result) = {prefix}(({short_name}*)prog)->{field};\n"   \
         "\treturn 0;\n"                                                     \
         "}}\n"
@@ -1190,58 +1218,85 @@ class RuntimeSpec():
         #"\tprintf(\"{{prog %p}}\",prog);\n"                              \
         #"\tprintf(\"{{field%p}}\",*(void**)result);\n"                              \
 
+        # The set of fields that should have accessors, each annotated with
+        # the code (if any) that should prefix references to those fields.
+        # This is mainly useful for working with references.
         program_fields = [
             (  "device", ""), (   "group", ""), (  "thread", ""),
-            ("_dev_ctx","&"), ("_grp_ctx","&"), ("_thd_ctx","&")
+            #("_dev_ctx","&"), ("_grp_ctx","&"), ("_thd_ctx","&")
         ]
 
-        # Generate specializations and init/exec trampolines for each
-        # program type defined by harmonize
+
+        # Accumulator for includes and initial declarations/typedefs
+        preamble      = ""
+        preamble     += "#include \""+self.spec_name+".cu\"\n"
+
+        # Accumulator for init/exec/async/sync wrappers
         dispatch_defs = ""
+        # Accumulator for accessors
         accessor_defs = ""
-        for kind, short_kind in [("Harmonize","hrm"), ("Event","evt")]:
-            short_name = self.spec_name.lower()+"_"+short_kind
-            dispatch_defs += spec_decl_template.format(kind=kind,name=self.spec_name,short_name=short_name)
-            dispatch_defs += init_template.format(short_name=short_name,name=self.spec_name,kind=kind)
-            dispatch_defs += exec_template.format(short_name=short_name,name=self.spec_name,kind=kind)
-            for (field,prefix) in program_fields:
-                accessor_defs += accessor_template.format(short_name=short_name,field=field,prefix=prefix)
-            # Generate the dispatch functions for each async function
-            for fn in self.async_fns:
-                param_text = func_param_text(func,self.type_map,rec_mode="void_ptr",prior=True,clip=0,first_void=True)
-                arg_text   = func_arg_text(func,self.type_map,rec_mode="cast_deref",prior=False,clip=1)
-                for kind in ["async","sync"]:
-                    dispatch_defs += dispatch_template.format(
-                        short_name=short_name,
-                        fn=fn.__name__,
-                        fn_type=pascal_case(fn.__name__),
-                        params=param_text,
-                        args=arg_text,
-                        kind=kind,
-                    )
 
+        # The name used to refer to the program template specialization
+        short_name = self.spec_name.lower() +"_"+shorthand
+        # Typedef the specialization to a more convenient shothand
+        preamble += spec_decl_template.format(kind=kind,name=self.spec_name,short_name=short_name)
 
-        return preamble + type_defs + param_decls + proto_decls + async_defs + spec_def + dispatch_defs + accessor_defs
+        # Generate the wrappers for kernel entry points
+        dispatch_defs += init_template.format(short_name=short_name,name=self.spec_name,kind=kind)
+        dispatch_defs += exec_template.format(short_name=short_name,name=self.spec_name,kind=kind)
+
+        # Generate the dispatch functions for each async function
+        for fn in self.async_fns:
+            # Accepts record parameters as void pointers
+            param_text = func_param_text(fn,self.type_map,rec_mode="void_ptr",prior=True,clip=0,first_void=True)
+            # Casts the void pointers of parameters to types with matching size and alignment
+            arg_text   = func_arg_text(fn,self.type_map,rec_mode="cast_deref",prior=False,clip=1)
+            # Generates a wrapper for both async and sync dispatches
+            for kind in ["async","sync"]:
+                dispatch_defs += dispatch_template.format(
+                    short_name=short_name,
+                    fn=fn.__name__,
+                    fn_type=pascal_case(fn.__name__),
+                    params=param_text,
+                    args=arg_text,
+                    kind=kind,
+                )
+
+        # Creates a field accesing function for each field
+        for (field,prefix) in program_fields:
+            accessor_defs += accessor_template.format(short_name=short_name,field=field,prefix=prefix)
+
+        return preamble + dispatch_defs + accessor_defs
+
 
 
     def generate_code(self):
 
+        # Folder used to cache cuda and ptx code
         cache_path = "__ptxcache__/"
 
-        harm_code = self.generate_harm_code()
-        harm_filename = cache_path+self.spec_name
-        harm_file = open(harm_filename+".cu",mode='w')
-        harm_file.write(harm_code)
-        harm_file.close()
+        # Generate and save generic program specification
+        base_code = self.generate_specification_code()
+        base_filename = cache_path+self.spec_name
+        base_file = open(base_filename+".cu",mode='w')
+        base_file.write(base_code)
+        base_file.close()
+        
+        # Compile the async function definitions to ptx
 
-        comp_cmd = "nvcc "+harm_filename+".cu -arch=native -rdc true " \
-                   "-c -include ../harmonize/code/harmonize.cpp -ptx " \
-                   "-o "+harm_filename+".ptx"
-        subprocess.run(comp_cmd.split(),shell=False,check=True)
-
-
+        # The list of required async functions
+        base_fns = [self.init_fn, self.final_fn, self.source_fn]
+        # The full list of async functions
         comp_list = [fn for fn in base_fns] + self.async_fns
-        self.link_list = [ harm_filename+".ptx" ]
+
+
+        # A list to record the files containing the definitions
+        # of each async function definition
+        self.fn_def_link_list = []
+        self.asyn = {}
+
+        # Compile each user-provided function defintion to ptx
+        # and save it to an appropriately named file
         for fn in comp_list:
             file_name = fn.__name__+".ptx"
             if fn in base_fns:
@@ -1249,42 +1304,73 @@ class RuntimeSpec():
             file_name = cache_path + file_name
             ptx_file  = open(file_name,mode='w')
             ptx_file.write(extern_device_ptx(fn,self.type_map))
-            self.link_list.append(file_name)
+            # Record the path of the generated ptx
+            self.fn_def_link_list.append(file_name)
             ptx_file.close()
         
-        init_dev_fn  = cuda.declare_device("init_"+self.spec_name+"_hrm",'void(voidptr,voidptr)')
-        exec_dev_fn  = cuda.declare_device("exec_"+self.spec_name+"_hrm",'void(voidptr,voidptr,uintp)')
+        self.init_dispatcher = {}
+        self.exec_dispatcher = {}
 
-        vp = numba.types.voidptr
+        # Generate and compile specializations of the specification for
+        # each kind of runtime
+        for kind, shortname in [("Harmonize","hrm"), ("Event","evt")]:
+            # Generate the cuda code implementing the specialization
+            spec_code = self.generate_specialization_code(kind,shortname)
+            # Save the code to an appropriately named file
+            spec_filename = cache_path+self.spec_name+"_"+shortname
+            spec_file = open(spec_filename+".cu",mode='w')
+            spec_file.write(spec_code)
+            spec_file.close()
 
-        def init_kernel(context : vp, state : vp):
-            init_dev_fn(context,state)
+            # Compile the specialization to ptx
+            comp_cmd = "nvcc "+spec_filename+".cu -arch=native -rdc true " \
+                    "-c -include ../harmonize/code/harmonize.cpp -ptx " \
+                    "-o "+spec_filename+".ptx"
+            subprocess.run(comp_cmd.split(),shell=False,check=True)
 
-        def exec_kernel(context : vp, state : vp, cycle_count : numba.uintp):
-            exec_dev_fn(context,state,cycle_count)
-
-        
-
-        self.init_dispatcher = cuda.jit(
-            init_kernel,
-            device=False,
-            link=self.link_list,
-            debug=True,
-            opt=False,
-            cache=False
-        )
-        self.exec_dispatcher = cuda.jit(
-            exec_kernel,
-            device=False,
-            link=self.link_list,
-            debug=True,
-            opt=False,
-            cache=False
-        )
+            # Create handles to reference the cuda entry wrapper functions
+            init_dev_fn  = cuda.declare_device("init_program",'void(voidptr,voidptr)')
+            exec_dev_fn  = cuda.declare_device("exec_program",'void(voidptr,voidptr,uintp)')
 
 
+            vp = numba.types.voidptr
+            
+            # Wrapper functions to call entry wrapper functions
+            def init_kernel(context : vp, state : vp):
+                init_dev_fn(context,state)
+ 
+            def exec_kernel(context : vp, state : vp, cycle_count : numba.uintp):
+                exec_dev_fn(context,state,cycle_count)
 
-    def instance(self):
+
+            link_list = [spec_filename+".ptx"] + self.fn_def_link_list
+
+
+            #async_even = cuda.declare_device('dispatch_even_async', sig)
+            #async_odd  = cuda.declare_device('dispatch_odd_async' , sig)
+            #device     = cuda.declare_device('access_device',   dev_sig)
+
+            # Finally, compile the entry functions, saving it for later use
+            self.init_dispatcher[kind] = cuda.jit(
+                init_kernel,
+                device=False,
+                link=link_list,
+                debug=True,
+                opt=False,
+                cache=False
+            )
+            self.exec_dispatcher[kind] = cuda.jit(
+                exec_kernel,
+                device=False,
+                link=link_list,
+                debug=True,
+                opt=False,
+                cache=False
+            )
+
+
+
+    def instance(self,kind="Harmonize"):
 
         # The integer in global memory used to track how many 'easy' work link
         # allocations have been made thusfar
@@ -1337,185 +1423,128 @@ class RuntimeSpec():
 
         return Runtime(
             dev_ctx_gpu, ctx_sta_gpu,
-            self.init_dispatcher,
-            self.exec_dispatcher
+            self.init_dispatcher[kind],
+            self.exec_dispatcher[kind]
         )
 
 
-
-
-val_count = 1024
-dev_state_type = numba.from_dtype(np.dtype([ ('before', np.uint64), ('val',np.dtype((np.uintp,val_count+1))), ('extra',np.uint32)]))
-grp_state_type = numba.from_dtype(np.dtype([ ]))
-thd_state_type = numba.from_dtype(np.dtype([ ]))
-
-
-collaz_iter_dtype = np.dtype([('value',np.int32), ('start',np.int32), ('steps',np.int32)])
-collaz_iter = numba.from_dtype(collaz_iter_dtype)
-
-sig = numba.types.void(numba.uintp,collaz_iter)
-
-dev_sig = dev_state_type(numba.uintp)
-
-async_even = cuda.declare_device('collaz_hrm_even_async', sig)
-async_odd  = cuda.declare_device('collaz_hrm_odd_async' , sig)
-device     = cuda.declare_device('collaz_hrm_device' , dev_sig)
-
-
-def even(prog: numba.uintp, iter: collaz_iter):
-    #numba.cuda.atomic.max(device(prog)['val'],iter['start'],iter['value'])
-    iter['steps'] += 1
-    iter['value'] /= 2
-    if iter['value'] % 2 == 0:
-        async_even(prog,iter)
-    else :
-        async_odd(prog,iter)
-
-@numba.jit(nopython=True)
-def immediate_return(param: dev_state_type) -> numba.types.voidptr:
-    result : numba.types.voidptr = param
-    return result
-
-@numba.jit(nopython=True)
-def from_void(param: dev_state_type) -> numba.types.voidptr:
-    result : numba.types.voidptr = param
-    return result
-
-def odd(prog: numba.uintp, iter: collaz_iter):
-    #numba.cuda.atomic.add(device(prog)['val'],iter['start'],1)
-    #numba.cuda.atomic.max(device(prog)['val'],iter['start'],iter['steps'])
+    def inject_fns(state_spec,async_fns):
     
-    if iter['value'] <= 1:
-        device(prog)['val'][1+iter['start']] = iter['steps']
-    else:
-        iter['value'] = iter['value'] * 3 + 1
-        iter['steps'] += 1
-        if iter['value'] % 2 == 0:
-            async_even(prog,iter)
-        else :
-            async_odd(prog,iter)
+        dev_state, grp_state, thd_state = state_spec
+
+        for func in async_fns:
+            sig = fn_sig(func)
+            name = func.__name__
+            for kind in ["async","sync"]:
+                dispatch_fn = cuda.declare_device("dispatch_"+name+"_"+kind, sig)
+                inject_global(kind+"_"+name,dispatch_fn,1)
+
+        field_list = [
+            ("device",dev_state),
+            ("group",grp_state),
+            ("thread",thd_state),
+        ]
+        for name, kind in field_list:
+            sig = kind(numba.uintp)
+            access_fn = cuda.declare_device("access_"+name,sig)
+            inject_global(name,access_fn,1)
 
 
-def initialize(prog: numba.uintp):
-    pass
+    def access_fns(state_spec):
+    
+        dev_state, grp_state, thd_state = state_spec
 
-def finalize(prog: numba.uintp):
-    pass
+        field_list = [
+            ("device",dev_state),
+            ("group",grp_state),
+            ("thread",thd_state),
+        ]
 
-def make_work(prog: numba.uintp) -> numba.boolean:
-    old = numba.cuda.atomic.add(device(prog)['val'],0,1)
-    if old >= val_count:
-        return False
-
-    #numba.cuda.atomic.add(device(prog)['val'],1+old,old)
-    iter = numba.cuda.local.array(1,collaz_iter)
-    iter[0]['value'] = old
-    iter[0]['start'] = old
-    iter[0]['steps'] = 0
-
-    if old % 2 == 0:
-        async_even(prog,iter[0])
-    else:
-        async_odd (prog,iter[0])
-    return True
+        result = []
+        for name, kind in field_list:
+            sig = kind(numba.uintp)
+            result.append(cuda.declare_device("access_"+name,sig))
+        return tuple(result)
 
 
-base_fns   = (initialize,finalize,make_work)
-state_spec = (dev_state_type,grp_state_type,thd_state_type) 
-async_fns  = [odd,even]
+    def dispatch_fns(kind,*async_fns):
+        async_fns, = async_fns
+        result = []
+        for func in async_fns:
+            sig = fn_sig(func)
+            name = func.__name__
+            result.append(cuda.declare_device("dispatch_"+name+"_"+kind, sig))
+        return tuple(result)
 
-collaz_spec = RuntimeSpec("collaz",state_spec,base_fns,async_fns)
+    def async_dispatch(*async_fns):
+        return RuntimeSpec.dispatch_fns("async",async_fns) 
 
-collaz_rt = collaz_spec.instance()
-
-collaz_rt.init(1024)
-
-collaz_rt.exec(6553)
-
-state = collaz_rt.load_state()
-print(state)
-
-def collaz_check(value):
-    step = 0
-    while value > 1:
-        step += 1
-        if value % 2 == 0:
-            value /= 2
-        else :
-            value = value * 3 + 1
-    return step
-
-total = 0
-for val in range(val_count):
-    steps = collaz_check(val)
-    total += steps
-    print(steps,end=", ")
-print("")
-print(f"Total: {total}")
-
-exit(0)
-
-
-float64 = np.float64
-int64   = np.int64
-uint64  = np.uint64
-bool_   = np.bool_
-
-particle = numba.from_dtype(np.dtype([('x',    float64), ('ux',    float64), ('w',     float64),
-                     ('seed', int64  ), ('event', int64  ), ('alive', bool_  ) ]))
-
-
-external = cuda.declare_device('external', 'int32(float32)')
-
-direct   = cuda.declare_device('direct', 'int32(float32)')
-
-
-code = harmonize("ProgramSpec",function_map,type_map,state_spec,base_fns,async_fns)
-code_file = open("prog.cu",mode='w')
-code_file.write(code)
-#harmonize("ProgramSpec",function_map,type_map,state_spec,base_fns,async_fns)
+    def sync_dispatch(*async_fns):
+        return RuntimeSpec.dispatch_fns("sync",async_fns) 
 
 
 
-PSIZE = 8
-
-
-
-np.dtype((np.void, PSIZE))
-arena_    = np.dtype([np.uintp,np.uintp])
-dev_ctx   = np.dtype([np.uintp,np.uintp])
-dev_state = np.dtype([])
-init = cuda.declare_device('init_programspecharmonize','void('+dev_ctx+','+dev_state+')')
-
-@cuda.jit(device=False,link=["./prog.cu"],debug=True,opt=False)
-def try_entry():
-    init()
-
-
-
-if False :
-
-    print(ext_func_adapt(simple))
-
-
-    simple_inner = cuda.declare_device('simple_kernel', 'void()')
-
-    @cuda.jit(device=False, link=["harm.ptx","./__ptxcache__/hrm_simple_dev.ptx"],debug=True,opt=False)
-    def do_simple():
-        simple_inner()
-
-
-    do_simple[1,32]()
-
-    #print(harm_func_trampoline(simple))
-
-    print(ext_func_adapt(complicated))
-    #print(harm_func_trampoline(complicated))
-
-    #print(particle)
-
-
-
-    #print(simple.__annotations__)
-    #print(device_ptx(simple))
-
+#float64 = np.float64
+#int64   = np.int64
+#uint64  = np.uint64
+#bool_   = np.bool_
+#
+#particle = numba.from_dtype(np.dtype([('x',    float64), ('ux',    float64), ('w',     float64),
+#                     ('seed', int64  ), ('event', int64  ), ('alive', bool_  ) ]))
+#
+#
+#external = cuda.declare_device('external', 'int32(float32)')
+#
+#direct   = cuda.declare_device('direct', 'int32(float32)')
+#
+#
+#code = harmonize("ProgramSpec",function_map,type_map,state_spec,base_fns,async_fns)
+#code_file = open("prog.cu",mode='w')
+#code_file.write(code)
+##harmonize("ProgramSpec",function_map,type_map,state_spec,base_fns,async_fns)
+#
+#
+#
+#PSIZE = 8
+#
+#
+#
+#np.dtype((np.void, PSIZE))
+#arena_    = np.dtype([np.uintp,np.uintp])
+#dev_ctx   = np.dtype([np.uintp,np.uintp])
+#dev_state = np.dtype([])
+#init = cuda.declare_device('init_programspecharmonize','void('+dev_ctx+','+dev_state+')')
+#
+#@cuda.jit(device=False,link=["./prog.cu"],debug=True,opt=False)
+#def try_entry():
+#    init()
+#
+#
+#
+#if False :
+#
+#    print(ext_func_adapt(simple))
+#
+#
+#    simple_inner = cuda.declare_device('simple_kernel', 'void()')
+#
+#    @cuda.jit(device=False, link=["harm.ptx","./__ptxcache__/hrm_simple_dev.ptx"],debug=True,opt=False)
+#    def do_simple():
+#        simple_inner()
+#
+#
+#    do_simple[1,32]()
+#
+#    #print(harm_func_trampoline(simple))
+#
+#    print(ext_func_adapt(complicated))
+#    #print(harm_func_trampoline(complicated))
+#
+#    #print(particle)
+#
+#
+#
+#    #print(simple.__annotations__)
+#    #print(device_ptx(simple))
+#
+#
