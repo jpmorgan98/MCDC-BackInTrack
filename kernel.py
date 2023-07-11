@@ -7,8 +7,6 @@ from constant import *
 
 import type_, adapter
 
-from type_ import global_, particle
-
 # =============================================================================
 # Events
 # =============================================================================
@@ -16,7 +14,7 @@ from type_ import global_, particle
 leakeag_try = np.array([0,0], dtype=np.float32)
 leakeag_tryd = cuda.to_device(leakeag_try)
 
-def source(mcdc: global_, P: particle):
+def source(P, mcdc):
     P['x']     = -mcdc['X'] + 2.0*mcdc['X']*rng(P, mcdc)
     P['ux']    = -1.0 + 2.0*rng(P, mcdc)
     P['w']     = 1.0
@@ -24,14 +22,14 @@ def source(mcdc: global_, P: particle):
 
     P['event'] = EVENT_MOVE
 
-def move(mcdc: global_, P: particle):
+def move(P, mcdc):
     SigmaT = mcdc['SigmaT']
     SigmaC = mcdc['SigmaC']
     SigmaS = mcdc['SigmaS']
     X      = mcdc['X']
 
     # Sample collision distance
-    distance  = -math.log(rng(mcdc,P))/SigmaT
+    distance  = -math.log(rng(P, mcdc))/SigmaT
     P['x']   += P['ux']*distance
 
     # Now, determine event
@@ -57,7 +55,7 @@ def move(mcdc: global_, P: particle):
                 else:
                     P['event'] = EVENT_FISSION
 
-def branchless_collision(mcdc: global_, P: particle):
+def branchless_collision(P, mcdc):
     #print('in bc')
     SigmaT = mcdc['SigmaT']
     SigmaS = mcdc['SigmaS']

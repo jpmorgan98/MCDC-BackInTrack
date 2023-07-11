@@ -149,7 +149,55 @@ def EVENT_simulation(mcdc, hostco):
         print(mcdc['bank'])
         print('\n\n')
         '''
+
+
+
+
+def ASYNC_simulation(mcdc, hostco):
+
+
+
+    # =========================================================================
+    # Simulation loop
+    # =========================================================================
+    print('To simulation')
+    it = 0
+    while np.max(hostco['stack_size'][1:]) > 0:
+        it += 1
+        # =====================================================================
+        # Initialize event
+        # =====================================================================
     
+        # Determine next event executed based on the longest stack
+        stack = np.argmax(hostco['stack_size'][1:]) + 1 # Offset for EVENT_NONE
+        event = hostco['event_idx'][stack]
+
+        #print(event)
+
+        # =================================================================
+        # Event loop
+        # =================================================================
+        
+        if event == EVENT_SOURCE:
+            #print('Source! {}'.format(event))
+            kernel.source(mcdc, hostco, event)
+        elif event == EVENT_MOVE:
+            #print('Source! {}'.format(event))
+            kernel.move(mcdc, hostco, event)
+        elif event == EVENT_SCATTERING:
+            #print('Source! {}'.format(event))
+            kernel.scattering(mcdc, hostco, event)
+        elif event == EVENT_FISSION:
+            #print('Source! {}'.format(event))
+            kernel.fission(mcdc, hostco, event)
+        elif event == EVENT_LEAKAGE:
+            #print('Source! {}'.format(event))
+            kernel.leakage(mcdc, hostco, event)
+        elif event == EVENT_BRANCHLESS_COLLISION:
+            print('Branchless Collision!', event)
+            kernel.branchless_collision(mcdc, hostco, event)
+
+
 
 # =============================================================================
 # Factory
@@ -159,5 +207,7 @@ def make_loops(alg, target):
     global simulation
     if alg == 'history':
         simulation = adapter.loop(HISTORY_simulation, target)
+    elif alg == "async":
+        simulation = adapter.loop(ASYNC_simulation, target)
     else:
         simulation = adapter.loop(EVENT_simulation, target)
