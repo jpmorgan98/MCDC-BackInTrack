@@ -38,7 +38,7 @@ N_particle = int(1E6) #int(1E5)
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, choices=['python', 'numba'], 
                     default='numba')
-parser.add_argument('--alg', type=str, choices=['history', 'event'], 
+parser.add_argument('--alg', type=str, choices=['history', 'event', 'async'], 
                     default='history')
 parser.add_argument('--target', type=str, choices=['cpu', 'gpu', 'cpus'],
                     default='cpu')
@@ -50,7 +50,7 @@ if mode == 'python' and target == 'gpu':
     print('[ERROR] Python mode cannot run on GPU.')
     sys.exit()
 if alg == 'history' and target == 'gpu':
-    print('[ERROR] GPU run currently only supports event-based algorithm.')
+    print('[ERROR] GPU run does not support history-based algorithm.')
     sys.exit()
 if target == 'gpu' and not branchless_collision:
     print('[ERROR] GPU run currently has to run with branchless collision.')
