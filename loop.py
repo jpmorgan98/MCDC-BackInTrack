@@ -208,6 +208,6 @@ def make_loops(alg, target):
     if alg == 'history':
         simulation = adapter.loop(HISTORY_simulation, target)
     elif alg == "async":
-        simulation = adapter.loop(ASYNC_simulation, target)
+        simulation = adapter.loop(ASYNC_simulation,   target)
     else:
-        simulation = adapter.loop(EVENT_simulation, target)
+        simulation = adapter.loop(EVENT_simulation,   target)
