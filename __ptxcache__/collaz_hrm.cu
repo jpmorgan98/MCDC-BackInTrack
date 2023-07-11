@@ -23,22 +23,22 @@ extern "C" __device__ int exec_program(
 }
 extern "C" __device__ 
 int dispatch_odd_async(void*, void* fn_param_1, void* fn_param_2){
-	((collaz_hrm*)fn_param_1)->template async<Odd>(*(_16b8*)fn_param_2);
+	((collaz_hrm*)fn_param_1)->template async<Odd>(*(_24b8*)fn_param_2);
 	return 0;
 }
 extern "C" __device__ 
 int dispatch_odd_sync(void*, void* fn_param_1, void* fn_param_2){
-	((collaz_hrm*)fn_param_1)->template sync<Odd>(*(_16b8*)fn_param_2);
+	((collaz_hrm*)fn_param_1)->template sync<Odd>(*(_24b8*)fn_param_2);
 	return 0;
 }
 extern "C" __device__ 
 int dispatch_even_async(void*, void* fn_param_1, void* fn_param_2){
-	((collaz_hrm*)fn_param_1)->template async<Even>(*(_16b8*)fn_param_2);
+	((collaz_hrm*)fn_param_1)->template async<Even>(*(_24b8*)fn_param_2);
 	return 0;
 }
 extern "C" __device__ 
 int dispatch_even_sync(void*, void* fn_param_1, void* fn_param_2){
-	((collaz_hrm*)fn_param_1)->template sync<Even>(*(_16b8*)fn_param_2);
+	((collaz_hrm*)fn_param_1)->template sync<Even>(*(_24b8*)fn_param_2);
 	return 0;
 }
 extern "C" __device__ 
