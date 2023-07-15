@@ -1,10 +1,14 @@
 
 import numpy as np
-from numba import cuda
+from numba import cuda, njit
 import numba
 import harm
 
-mode = "event" #"async"
+from numba import config
+
+mode = "async"
+
+config.DISABLE_JIT = False
 
 val_count = 65536*2
 dev_state_type = numba.from_dtype(np.dtype([ ('val',np.dtype((np.uintp,val_count+1))) ]))
@@ -14,9 +18,13 @@ thd_state_type = numba.from_dtype(np.dtype([ ]))
 collaz_iter_dtype = np.dtype([('value',np.int64), ('start',np.int64), ('steps',np.int64)])
 collaz_iter = numba.from_dtype(collaz_iter_dtype)
 
+@njit
+def should_halt(iter: collaz_iter) -> numba.boolean :
+    return (iter['value'] <= 1)
+
 
 def even(prog: numba.uintp, iter: collaz_iter):
-    if iter['value'] <= 1:
+    if should_halt(iter):
         device(prog)['val'][1+iter['start']] = iter['steps']
     else:
         iter['steps'] += 1
@@ -64,6 +72,9 @@ def make_work(prog: numba.uintp) -> numba.boolean:
 
     return True
 
+
+
+
 base_fns   = (initialize,finalize,make_work)
 state_spec = (dev_state_type,grp_state_type,thd_state_type) 
 async_fns  = [odd,even]
@@ -72,6 +83,10 @@ device, group, thread = harm.RuntimeSpec.access_fns(state_spec)
 odd_async, even_async = harm.RuntimeSpec.async_dispatch(odd,even)
 
 collaz_spec = harm.RuntimeSpec("collaz",state_spec,base_fns,async_fns)
+
+
+
+
 
 if mode == "async":
     runtime = collaz_spec.harmonize_instance()

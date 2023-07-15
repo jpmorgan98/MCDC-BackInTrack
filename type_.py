@@ -14,6 +14,7 @@ bool_   = np.bool_
 # Particle (in-flight)
 particle = np.dtype([('x', float64), ('ux', float64), ('w', float64),
                      ('seed', int64), ('event', int64), ('alive', bool_)])
+                     #,('padA',np.uint8), ('padB', np.uint16), ('padC', np.uint32)])
 
 # Particle record (in-bank/stack)
 particle_rec = np.dtype([('x', float64), ('ux', float64), ('w', float64)])
@@ -54,42 +55,44 @@ def make_type_global(N_particle, N_stack, alg):
               ('tally', float64, (3,)), 
               
               ('rng_g', int64), ('rng_c', int64), ('rng_mod', uint64),
-              ('seed', int64),
+              ('seed', int64),  ('N_thread', int64)]
 
-              ('history_stride', int64),
-              ('event_stride', int64, (N_EVENT,)),
-
-              ('stack_idx', int64, (N_EVENT,)),
-              ('event_idx', int64, (N_stack,)),
-
-              ('N_thread', int64)]
     
     # ======================================
     # Bank and stack
     # ======================================
-
-    # Sizes
-    if alg == 'history':
-        bank_size  = 100000
-        stack_size = 0
+    if alg == 'async':
+        struct += [('source_counter',int64,(1,))]
     else:
-        bank_size  = int(2*N_particle)
-        stack_size = int(2*N_particle)
+        struct += [
+                   ('history_stride', int64),
+                   ('event_stride', int64, (N_EVENT,)),
 
-    type_stack = get_type_bank(stack_size)
-    struct += [('bank', get_type_bank(bank_size)), 
-               ('stack_', get_type_stack(stack_size), (N_stack,))]
+                   ('stack_idx', int64, (N_EVENT,)),
+                   ('event_idx', int64, (N_stack,))]
 
-    # ======================================
 
-    # Secondaries parameters for sync in branching event
-    struct += [('secondaries_stack', int64, (stack_size,)),
-               ('secondaries_counter', int64, (stack_size, N_stack)),
-               ('secondaries_idx', int64, (stack_size, N_stack))]
+        # Sizes
+        if alg == 'history':
+            bank_size  = 100000
+            stack_size = 0
+        else:
+            bank_size  = int(2*N_particle)
+            stack_size = int(2*N_particle)
+
+        type_stack = get_type_bank(stack_size)
+        struct += [('bank', get_type_bank(bank_size)), 
+                ('stack_', get_type_stack(stack_size), (N_stack,))]
+
+        # ======================================
+
+        # Secondaries parameters for sync in branching event
+        struct += [('secondaries_stack', int64, (stack_size,)),
+                ('secondaries_counter', int64, (stack_size, N_stack)),
+                ('secondaries_idx', int64, (stack_size, N_stack))]
 
     # Bool-typed (TODO: report bug)
     struct += [('history_based', bool_), ('gpu', bool_), 
-               ('branchless_collision', bool_)]
-
+            ('branchless_collision', bool_)]
 
     global_ = np.dtype(struct)
