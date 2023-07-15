@@ -22,13 +22,13 @@ SigmaS     = 0.5
 SigmaF     = 0.25
 nu         = 2.0
 SigmaT     = SigmaC + SigmaS + SigmaF
-X          = 3.0
+X          = 12.0
 
 # Technique
 branchless_collision = True
 
 # Parameters
-N_particle = int(1E6) #int(1E5)
+N_particle = int(1E7) #int(1E5)
 
 # =============================================================================
 # SETUP
@@ -46,21 +46,31 @@ args, unargs = parser.parse_known_args()
 alg = args.alg
 target = args.target
 mode = args.mode
-if mode == 'python' and target == 'gpu':
-    print('[ERROR] Python mode cannot run on GPU.')
-    sys.exit()
-if alg == 'history' and target == 'gpu':
-    print('[ERROR] GPU run does not support history-based algorithm.')
-    sys.exit()
-if target == 'gpu' and not branchless_collision:
-    print('[ERROR] GPU run currently has to run with branchless collision.')
-    sys.exit()
+
+if target == 'gpu':
+    if mode == 'python':
+        print('[ERROR] Python mode cannot run on GPU.')
+        sys.exit()
+    if alg  == 'history':
+        print('[ERROR] GPU run does not support history-based algorithm.')
+        sys.exit()
+    if alg  == 'event' and not branchless_collision: 
+        print('[ERROR] Event-based GPU run currently has to run with branchless collision.')
+        sys.exit()
+else:
+    if alg == 'event':
+        print('[ERROR] Event algorithm currently only supports GPU targets.')
+        sys.exit()
 
 # Pure python mode?
 if mode == 'python':
     config.DISABLE_JIT = True
 elif mode == 'numba':
     config.DISABLE_JIT = False
+
+if alg == 'async':
+    branchless_collision = False
+
 
 # Event stacks
 if branchless_collision:
@@ -73,11 +83,14 @@ else:
 #N_stack = N_EVENT
 
 print('Location -A')
+print(target)
 
 # Make types, kernels, and loops
 type_.make_type_global(N_particle, N_stack, alg)
 kernel.make_kernels(alg, target)
+
 loop.make_loops(alg, target)
+
 
 # Allocate global variable container
 mcdc = np.zeros(1, dtype=type_.global_)[0]
@@ -124,27 +137,29 @@ else:
 # ========================================
 # Event-based parameters and helpers
 # ========================================
+if alg == 'event':
+    mcdc['N_stack']   = N_stack
+    mcdc['stack_idx'] = np.arange(N_EVENT)
+    mcdc['event_idx'] = np.arange(N_stack)
 
-mcdc['N_stack']   = N_stack
-mcdc['stack_idx'] = np.arange(N_EVENT)
-mcdc['event_idx'] = np.arange(N_stack)
+    # To initiate stack-driven algorithm
+    mcdc['stack_'][EVENT_SOURCE]['size'] = mcdc['N_particle']
+    mcdc['stack_'][EVENT_NONE]['size']   = \
+                mcdc['stack_'][EVENT_NONE]['content'].shape[0] - mcdc['N_particle']
 
-# To initiate stack-driven algorithm
-mcdc['stack_'][EVENT_SOURCE]['size'] = mcdc['N_particle']
-mcdc['stack_'][EVENT_NONE]['size']   = \
-             mcdc['stack_'][EVENT_NONE]['content'].shape[0] - mcdc['N_particle']
-
-# Strides -- number of rands reqired for a given operation
-mcdc['history_stride']                           = RNG_STRIDE
-mcdc['event_stride'][EVENT_SOURCE]               = 2
-mcdc['event_stride'][EVENT_MOVE]                 = 2
-mcdc['event_stride'][EVENT_SCATTERING]           = 1
-mcdc['event_stride'][EVENT_FISSION]              = 2
-mcdc['event_stride'][EVENT_LEAKAGE]              = 0
-mcdc['event_stride'][EVENT_BRANCHLESS_COLLISION] = 1
+    # Strides -- number of rands reqired for a given operation
+    mcdc['history_stride']                           = RNG_STRIDE
+    mcdc['event_stride'][EVENT_SOURCE]               = 2
+    mcdc['event_stride'][EVENT_MOVE]                 = 2
+    mcdc['event_stride'][EVENT_SCATTERING]           = 1
+    mcdc['event_stride'][EVENT_FISSION]              = 2
+    mcdc['event_stride'][EVENT_LEAKAGE]              = 0
+    mcdc['event_stride'][EVENT_BRANCHLESS_COLLISION] = 1
+elif alg == 'history':
+    mcdc['history_stride']                           = RNG_STRIDE
 
 # Branchless collision edits
-if mcdc['branchless_collision']:
+if alg =='event' and mcdc['branchless_collision']:
     # Replace (scattering, fission) with (leakage, branchless collision)
     mcdc['stack_idx'][EVENT_LEAKAGE]              = EVENT_SCATTERING
     mcdc['stack_idx'][EVENT_BRANCHLESS_COLLISION] = EVENT_FISSION
@@ -159,17 +174,18 @@ if mcdc['branchless_collision']:
 
 # Make and set GPU host controller
 hostco               = type_.get_hostco(N_stack)
-hostco['N_thread']   = mcdc['N_thread']
-hostco['stack_size'] = mcdc['stack_']['size']
-hostco['event_idx']  = mcdc['event_idx']
+if alg != 'async':
+    hostco['N_thread']   = mcdc['N_thread']
+    hostco['stack_size'] = mcdc['stack_']['size']
+    hostco['event_idx']  = mcdc['event_idx']
+    print(mcdc['event_idx'])
 
 
-print(mcdc['event_idx'])
 # =============================================================================
 # RUN
 # =============================================================================
 
-#print(numba.typeof(mcdc))
+#print(mcdc)
 
 start = time.perf_counter()
 loop.simulation(mcdc, hostco)
