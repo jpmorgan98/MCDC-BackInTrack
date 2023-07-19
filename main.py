@@ -22,13 +22,13 @@ SigmaS     = 0.5
 SigmaF     = 0.25
 nu         = 2.0
 SigmaT     = SigmaC + SigmaS + SigmaF
-X          = 12.0
+X          = 3.0
 
 # Technique
 branchless_collision = True
 
 # Parameters
-N_particle = int(1E7) #int(1E5)
+N_particle = int(1E6) #int(1E5)
 
 # =============================================================================
 # SETUP
@@ -69,7 +69,7 @@ elif mode == 'numba':
     config.DISABLE_JIT = False
 
 if alg == 'async':
-    branchless_collision = False
+    branchless_collision = True
 
 
 # Event stacks
@@ -83,7 +83,6 @@ else:
 #N_stack = N_EVENT
 
 print('Location -A')
-print(target)
 
 # Make types, kernels, and loops
 type_.make_type_global(N_particle, N_stack, alg)

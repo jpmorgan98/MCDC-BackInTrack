@@ -319,7 +319,6 @@ def make_kernels(alg, target):
     fission                 = adapter.event(fission, alg, target, EVENT_FISSION, naive=True)
     branchless_collision    = adapter.event(branchless_collision, alg, target, EVENT_BRANCHLESS_COLLISION)
 
-    print(source)
     
 
 

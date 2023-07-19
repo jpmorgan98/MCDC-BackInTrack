@@ -156,8 +156,10 @@ def EVENT_simulation(mcdc, hostco):
         print('\n\n')
         '''
 
-import harm
-
+path_to_harmonize='../harmonize/code'
+import sys
+sys.path.append(path_to_harmonize)
+import harmonize as harm
 def ASYNC_simulation_factory(single_fn=True, asynchronous=True):
 
     val_count = 65536*2
@@ -278,7 +280,7 @@ def ASYNC_simulation_factory(single_fn=True, asynchronous=True):
             return True
 
         base_fns   = (initialize,finalize,make_work)
-        program_spec = harm.RuntimeSpec("mcdc",state_spec,base_fns,one_event_fns)
+        program_spec = harm.RuntimeSpec("mcdc",state_spec,base_fns,one_event_fns,WORK_ARENA_SIZE=655360)
     else:
         def make_work(prog: numba.uintp) -> numba.boolean:
             N_particle = device(prog)['N_particle']
@@ -327,6 +329,6 @@ def make_loops(alg, target):
     elif alg == 'event':
         simulation = adapter.loop(EVENT_simulation,   target)
     elif alg == 'async':
-        simulation = ASYNC_simulation_factory(False,True)
+        simulation = ASYNC_simulation_factory(True,True)
     else:
         print(f"[ERROR] Unrecognized algorithm type '{alg}'")
