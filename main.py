@@ -22,13 +22,13 @@ SigmaS     = 0.5
 SigmaF     = 0.25
 nu         = 2.0
 SigmaT     = SigmaC + SigmaS + SigmaF
-X          = 12.0
+X          = 3.0
 
 # Technique
 branchless_collision = True
 
 # Parameters
-N_particle = int(1E7) #int(1E5)
+N_particle = int(1E6) #int(1E5)
 
 # =============================================================================
 # SETUP
@@ -68,9 +68,6 @@ if mode == 'python':
 elif mode == 'numba':
     config.DISABLE_JIT = False
 
-if alg == 'async':
-    branchless_collision = False
-
 
 # Event stacks
 if branchless_collision:
@@ -83,7 +80,6 @@ else:
 #N_stack = N_EVENT
 
 print('Location -A')
-print(target)
 
 # Make types, kernels, and loops
 type_.make_type_global(N_particle, N_stack, alg)
@@ -173,7 +169,8 @@ if alg =='event' and mcdc['branchless_collision']:
 # ========================================
 
 # Make and set GPU host controller
-hostco               = type_.get_hostco(N_stack)
+#hostco               = type_.get_hostco(N_stack)
+hostco = np.zeros(1, dtype=type_.get_hostco(N_stack))[0]
 if alg != 'async':
     hostco['N_thread']   = mcdc['N_thread']
     hostco['stack_size'] = mcdc['stack_']['size']

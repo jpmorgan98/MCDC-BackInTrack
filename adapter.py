@@ -23,9 +23,9 @@ def loop(func, target):
     else:
         def wrap(mcdc, hostco):
             # Create device copies
-            d_mcdc = cuda.to_device(mcdc)
-            func(d_mcdc, hostco)
-            d_mcdc.copy_to_host(mcdc)
+            #d_mcdc = cuda.to_device(mcdc)
+            func(mcdc, hostco)
+            #d_mcdc.copy_to_host(mcdc)
         return wrap
 
 
@@ -36,7 +36,7 @@ def loop(func, target):
 # =============================================================================
 
 def event(func, alg, target, event, branching=False, naive=False):
-    func = compiler(func, target)
+    func = compiler(func, "gpu_device")
 
     if alg != 'event':
         return func
@@ -46,6 +46,9 @@ def event(func, alg, target, event, branching=False, naive=False):
     wrap = None
 
     def wrap_streaming(mcdc, hostco):
+
+        nonlocal func
+
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
         
@@ -227,7 +230,7 @@ def event(func, alg, target, event, branching=False, naive=False):
         return N_block, N_thread
 
     #print(event)
-    def hardware_wrap(mcdc, hostco):
+    def hardware_wrap(mcdc, gpu_mcdc, hostco, gpu_hostco):
         nonlocal event
         nonlocal wrap
         # recorrecting event index in stack if branchless collision
@@ -237,7 +240,7 @@ def event(func, alg, target, event, branching=False, naive=False):
             elif event == 5:
                 event = 3
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
-        wrap[N_block, N_thread](mcdc, hostco)
+        wrap[N_block, N_thread](gpu_mcdc, hostco)
 
     return hardware_wrap
 
@@ -255,7 +258,6 @@ def compiler(func, target):
     elif target == 'gpu_device':
         return cuda.jit(func,device=True)
     elif target == 'gpu':
-        #print("Compiling CUDA")
         return cuda.jit(func)
     else:
         print(f"[ERROR] Unrecognized target '{target}'.")
