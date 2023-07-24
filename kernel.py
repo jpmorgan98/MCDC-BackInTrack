@@ -210,6 +210,7 @@ def terminate_particle(P):
 get_idx = None
 def CPU_get_idx():
     return 0, 1
+
 def GPU_get_idx():
     return cuda.grid(1), cuda.gridsize(1)
 
@@ -274,10 +275,14 @@ def make_kernels(alg, target):
         target = 'gpu_device'
         fission = async_fission
 
+    sub_target = target
+    if target == 'gpu':
+        sub_target = 'gpu_device'
+
     # RNG
     global rng, rng_skip_ahead
-    rng            = adapter.compiler(rng, target)
-    rng_skip_ahead = adapter.compiler(rng_skip_ahead, target)
+    rng            = adapter.compiler(rng, sub_target)
+    rng_skip_ahead = adapter.compiler(rng_skip_ahead, sub_target)
     
     # ========================================
     # Utilities
@@ -286,9 +291,9 @@ def make_kernels(alg, target):
     global read_particle, record_particle, terminate_particle, get_idx, create,\
            exscan, atomic_add
 
-    read_particle   = adapter.compiler(read_particle, target)
-    record_particle = adapter.compiler(record_particle, target)
-    terminate_particle = adapter.compiler(terminate_particle, target)
+    read_particle   = adapter.compiler(read_particle, sub_target)
+    record_particle = adapter.compiler(record_particle, sub_target)
+    terminate_particle = adapter.compiler(terminate_particle, sub_target)
     if target == 'cpu':
         get_idx = adapter.compiler(CPU_get_idx, target)
         create  = adapter.compiler(CPU_create, target)
@@ -296,11 +301,11 @@ def make_kernels(alg, target):
         atomic_add = adapter.compiler(CPU_atomic_add, target)
     else:
         #! added gpu_device in place of target
-        get_idx    = adapter.compiler(GPU_get_idx, target)
-        create     = adapter.compiler(GPU_create, target)
-        exscan     = adapter.compiler(GPU_exscan, target)
-        atomic_add = adapter.compiler(GPU_atomic_add, target)
-        sync       = adapter.compiler(GPU_sync, target)
+        get_idx    = adapter.compiler(GPU_get_idx, sub_target)
+        create     = adapter.compiler(GPU_create, sub_target)
+        exscan     = adapter.compiler(GPU_exscan, sub_target)
+        atomic_add = adapter.compiler(GPU_atomic_add, sub_target)
+        sync       = adapter.compiler(GPU_sync, sub_target)
 
     global initialize_stack
 
@@ -313,7 +318,7 @@ def make_kernels(alg, target):
     global source, move, leakage, scattering, branchless_collision
     
     source                  = adapter.event(source, alg, target, EVENT_SOURCE)
-    move                    = adapter.event(move, alg, target, EVENT_MOVE) #, branching=True)
+    move                    = adapter.event(move, alg, target, EVENT_MOVE)#, branching=True)
     leakage                 = adapter.event(leakage, alg, target, EVENT_LEAKAGE)
     scattering              = adapter.event(scattering, alg, target, EVENT_SCATTERING)
     fission                 = adapter.event(fission, alg, target, EVENT_FISSION, naive=True)

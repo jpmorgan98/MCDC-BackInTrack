@@ -68,9 +68,6 @@ if mode == 'python':
 elif mode == 'numba':
     config.DISABLE_JIT = False
 
-if alg == 'async':
-    branchless_collision = True
-
 
 # Event stacks
 if branchless_collision:
@@ -172,7 +169,8 @@ if alg =='event' and mcdc['branchless_collision']:
 # ========================================
 
 # Make and set GPU host controller
-hostco               = type_.get_hostco(N_stack)
+#hostco               = type_.get_hostco(N_stack)
+hostco = np.zeros(1, dtype=type_.get_hostco(N_stack))[0]
 if alg != 'async':
     hostco['N_thread']   = mcdc['N_thread']
     hostco['stack_size'] = mcdc['stack_']['size']

@@ -102,8 +102,12 @@ def EVENT_simulation(mcdc, hostco):
     #kernel.initialize_stack(mcdc,hostco)
     #else:
     #!kernel.initialize_stack(mcdc, hostco)
-    b,t = adapter.gpu_config(mcdc['N_particle'], hostco)
-    kernel.initialize_stack[b,t](mcdc, hostco)
+    
+    #b,t = adapter.gpu_config(mcdc['N_particle'], hostco)
+    b,t = adapter.gpu_config(int(1E6), hostco)
+    gpu_hostco = cuda.to_device(hostco)
+    gpu_mcdc   = cuda.to_device(mcdc)
+    kernel.initialize_stack[b,t](gpu_mcdc, gpu_hostco)
         
     # =========================================================================
     # Simulation loop
@@ -112,11 +116,13 @@ def EVENT_simulation(mcdc, hostco):
     it = 0
     while np.max(hostco['stack_size'][1:]) > 0:
         it += 1
+        #print(it)
         # =====================================================================
         # Initialize event
         # =====================================================================
     
         # Determine next event executed based on the longest stack
+        #gpu_hostco.copy_to_host(hostco)
         stack = np.argmax(hostco['stack_size'][1:]) + 1 # Offset for EVENT_NONE
         event = hostco['event_idx'][stack]
 
@@ -128,22 +134,23 @@ def EVENT_simulation(mcdc, hostco):
         
         if event == EVENT_SOURCE:
             #print('Source! {}'.format(event))
-            kernel.source(mcdc, hostco)
+            kernel.source(mcdc, gpu_mcdc, hostco, gpu_hostco)
         elif event == EVENT_MOVE:
             #print('Move! {}'.format(event))
-            kernel.move(mcdc, hostco)
+            kernel.move(mcdc, gpu_mcdc, hostco,  gpu_hostco)
         elif event == EVENT_SCATTERING:
             #print('Scattering! {}'.format(event))
-            kernel.scattering(mcdc, hostco)
+            kernel.scattering(mcdc, gpu_mcdc, hostco, gpu_hostco)
         elif event == EVENT_FISSION:
             #print('Fission! {}'.format(event))
-            kernel.fission(mcdc, hostco)
+            kernel.fission(mcdc, gpu_mcdc, hostco, gpu_hostco)
         elif event == EVENT_LEAKAGE:
             #print('Leak! {}'.format(event))
-            kernel.leakage(mcdc, hostco)
+            kernel.leakage(mcdc, gpu_mcdc, hostco, gpu_hostco)
         elif event == EVENT_BRANCHLESS_COLLISION:
             #print('Branchless Collision!', event)
-            kernel.branchless_collision(mcdc, hostco)
+            kernel.branchless_collision(mcdc, gpu_mcdc, hostco, gpu_hostco)
+
 
         '''
         print(hostco['stack_size'])
@@ -156,7 +163,9 @@ def EVENT_simulation(mcdc, hostco):
         print('\n\n')
         '''
 
-path_to_harmonize='../harmonize/code'
+    gpu_mcdc.copy_to_host(mcdc)
+
+path_to_harmonize='../harmonize-code'
 import sys
 sys.path.append(path_to_harmonize)
 import harmonize as harm
