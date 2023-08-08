@@ -61,7 +61,7 @@ def make_type_global(N_particle, N_stack, alg):
     # ======================================
     # Bank and stack
     # ======================================
-    if alg == 'async':
+    if alg in [ 'async', 'async-multi', 'new-event', 'new-event-multi' ]:
         struct += [('source_counter',int64,(1,))]
     else:
         struct += [

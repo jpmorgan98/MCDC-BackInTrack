@@ -165,13 +165,12 @@ def EVENT_simulation(mcdc, hostco):
 
     gpu_mcdc.copy_to_host(mcdc)
 
-path_to_harmonize='../harmonize-code'
+path_to_harmonize='../harmonize'
 import sys
 sys.path.append(path_to_harmonize)
 import harmonize as harm
 def ASYNC_simulation_factory(single_fn=True, asynchronous=True):
 
-    val_count = 65536*2
     dev_state_type = numba.from_dtype(type_.global_)
     grp_state_type = numba.from_dtype(np.dtype([ ]))
     thd_state_type = numba.from_dtype(np.dtype([ ]))
@@ -278,7 +277,13 @@ def ASYNC_simulation_factory(single_fn=True, asynchronous=True):
     if single_fn:
         def make_work(prog: numba.uintp) -> numba.boolean:
             N_particle = device(prog)['N_particle']
-            index = numba.cuda.atomic.add(device(prog)['source_counter'],0,1)
+            
+            WARP_SIZE = 32
+            shared_offset = numba.cuda.shared.array(1,numba.uint64)
+            if numba.cuda.threadIdx.x == 0:
+                shared_offset[0] = numba.cuda.atomic.add(device(prog)['source_counter'],0,WARP_SIZE)
+                
+            index = numba.cuda.atomic.add(shared_offset,0,1)
             if index >= N_particle:
                 return False
             
@@ -312,12 +317,12 @@ def ASYNC_simulation_factory(single_fn=True, asynchronous=True):
         runtime = program_spec.event_instance(io_capacity=65536*4,load_margin=1024)
 
     def runner(mcdc,hostco):
-        runtime.init(4096)
+        runtime.init(256)
         runtime.store_state(mcdc)
         if asynchronous:
-            runtime.exec(655360,4096)
+            runtime.exec(655360,256)
         else:
-            runtime.exec(4,4096)
+            runtime.exec(4,1024)
         runtime.load_state(mcdc)
 
     return runner
@@ -339,5 +344,11 @@ def make_loops(alg, target):
         simulation = adapter.loop(EVENT_simulation,   target)
     elif alg == 'async':
         simulation = ASYNC_simulation_factory(True,True)
+    elif alg == 'async-multi':
+        simulation = ASYNC_simulation_factory(False,True)
+    elif alg == 'new-event':
+        simulation = ASYNC_simulation_factory(True,False)
+    elif alg == 'new-event-multi':
+        simulation = ASYNC_simulation_factory(False,False)
     else:
         print(f"[ERROR] Unrecognized algorithm type '{alg}'")

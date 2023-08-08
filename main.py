@@ -38,7 +38,7 @@ N_particle = int(1E6) #int(1E5)
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, choices=['python', 'numba'], 
                     default='numba')
-parser.add_argument('--alg', type=str, choices=['history', 'event', 'async'], 
+parser.add_argument('--alg', type=str, choices=['history', 'event', 'async','async-multi','new-event','new-event-multi'], 
                     default='history')
 parser.add_argument('--target', type=str, choices=['cpu', 'gpu', 'cpus'],
                     default='cpu')
@@ -171,7 +171,7 @@ if alg =='event' and mcdc['branchless_collision']:
 # Make and set GPU host controller
 #hostco               = type_.get_hostco(N_stack)
 hostco = np.zeros(1, dtype=type_.get_hostco(N_stack))[0]
-if alg != 'async':
+if alg not in [ 'async', 'async-multi', 'new-event', 'new-event-multi' ]:
     hostco['N_thread']   = mcdc['N_thread']
     hostco['stack_size'] = mcdc['stack_']['size']
     hostco['event_idx']  = mcdc['event_idx']

@@ -271,7 +271,7 @@ def make_kernels(alg, target):
     # =========================================================================
 
     global fission
-    if alg == 'async':
+    if alg in [ 'async', 'async-multi', 'new-event', 'new-event-multi' ]:
         target = 'gpu_device'
         fission = async_fission
 
