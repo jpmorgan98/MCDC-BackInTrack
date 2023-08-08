@@ -1,3 +1,5 @@
+
+import numba
 from numba import njit, cuda, jit
 
 import type_, kernel
@@ -5,6 +7,11 @@ import type_, kernel
 from constant import *
 
 #event = None
+
+@cuda.jit(device=True)
+def syncthreads():
+    numba.cuda.syncthreads()
+
 
 # =============================================================================
 # Loop adapters
@@ -16,26 +23,32 @@ def loop(func, target):
     else:
         def wrap(mcdc, hostco):
             # Create device copies
-            d_mcdc = cuda.to_device(mcdc)
-            func(d_mcdc, hostco)
-            d_mcdc.copy_to_host(mcdc)
+            #d_mcdc = cuda.to_device(mcdc)
+            func(mcdc, hostco)
+            #d_mcdc.copy_to_host(mcdc)
         return wrap
+
+
+
 
 # =============================================================================
 # Kernel adapters
 # =============================================================================
 
 def event(func, alg, target, event, branching=False, naive=False):
-    func = compiler(func, target)
+    func = compiler(func, "gpu_device")
 
-    if alg == 'history':
+    if alg != 'event':
         return func
-   
+
     # Event-based zone below
 
     wrap = None
 
-    def wrap_streaming(mcdc, hostco, event):
+    def wrap_streaming(mcdc, hostco):
+
+        nonlocal func
+
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
         
@@ -79,8 +92,8 @@ def event(func, alg, target, event, branching=False, naive=False):
                 # Update next event stack size
                 mcdc['stack_'][next_stack]['size'] += N
                 hostco['stack_size'][next_stack]   += N
-        
-    def wrap_branching(mcdc, hostco, event):
+
+    def wrap_branching(mcdc, hostco):
         # Stack index of the current event
         stack = mcdc['stack_idx'][event]
         # print(stack)
@@ -89,7 +102,7 @@ def event(func, alg, target, event, branching=False, naive=False):
         N = mcdc['stack_'][stack]['size']
         start, stride = kernel.get_idx()
         for i in range(start, N, stride):
-            cuda.syncthreads
+            #syncthreads()
             # Get particle index from stack
             idx = mcdc['stack_'][stack]['content'][i]
 
@@ -125,8 +138,7 @@ def event(func, alg, target, event, branching=False, naive=False):
 
         # Launch exclusive scan algorithm [M. Harris 2007]
         #  to get secondaries global indices
-        cuda.syncthreads
-        if (cuda.threadIdx == 0):
+        if (cuda.threadIdx.x == 0):
             kernel.exscan(mcdc['secondaries_counter'], mcdc['secondaries_idx'], N)
             stride = 1
             # Update all events stack based on the secondaries parameters
@@ -154,7 +166,7 @@ def event(func, alg, target, event, branching=False, naive=False):
                 for j in range(mcdc['N_stack']):
                     mcdc['secondaries_counter'][i, j] = 0
                     mcdc['secondaries_idx'][i, j]     = 0
-        cuda.syncthreads
+        #syncthreads()
     
     def wrap_naive(mcdc, hostco, event):
         # Stack index of the current event
@@ -211,40 +223,55 @@ def event(func, alg, target, event, branching=False, naive=False):
         return wrap
 
     # GPU-Event-based zone below
+    def gpu_config(N, hostco):
+        N_thread = hostco['N_thread']
+        N_block = (N + (N_thread - 1)) // N_thread
 
-    def hardware_wrap(mcdc, hostco, event):
-        
+        return N_block, N_thread
+
+    #print(event)
+    def hardware_wrap(mcdc, gpu_mcdc, hostco, gpu_hostco):
+        nonlocal event
+        nonlocal wrap
         # recorrecting event index in stack if branchless collision
         if mcdc['branchless_collision']:
             if event == 6:
                 event = 4
             elif event == 5:
                 event = 3
-        #print(event)
         N_block, N_thread = gpu_config(hostco['stack_size'][event], hostco)
-        
-        wrap[N_block, N_thread](mcdc, hostco, event) #actaully running
-
+        wrap[N_block, N_thread](gpu_mcdc, hostco)
 
     return hardware_wrap
+
 
 # =============================================================================
 # Utilities
 # =============================================================================
+
 
 def compiler(func, target):
     if target == 'cpu':
         return jit(func, nopython=True, nogil=True)#, parallel=True)
     elif target == 'cpus':
         return jit(func, nopython=True, nogil=True, parallel=True)
-    else:
+    elif target == 'gpu_device':
+        return cuda.jit(func,device=True)
+    elif target == 'gpu':
         return cuda.jit(func)
+    else:
+        print(f"[ERROR] Unrecognized target '{target}'.")
 
 def parallel_compile(func):
     return jit(func, nopython=True, nogil=True, parallel=True)
 
+@njit
 def gpu_config(N, hostco):
     N_thread = hostco['N_thread']
     N_block = (N + (N_thread - 1)) // N_thread
 
     return N_block, N_thread
+
+
+
+

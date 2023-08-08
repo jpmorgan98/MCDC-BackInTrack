@@ -1,7 +1,8 @@
 import math
 import numpy as np
 
-from numba import cuda
+import numba
+from numba import cuda, njit
 
 from constant import *
 
@@ -13,6 +14,7 @@ import type_, adapter
 
 leakeag_try = np.array([0,0], dtype=np.float32)
 leakeag_tryd = cuda.to_device(leakeag_try)
+
 
 def source(P, mcdc):
     P['x']     = -mcdc['X'] + 2.0*mcdc['X']*rng(P, mcdc)
@@ -55,6 +57,7 @@ def move(P, mcdc):
                 else:
                     P['event'] = EVENT_FISSION
 
+
 def branchless_collision(P, mcdc):
     #print('in bc')
     SigmaT = mcdc['SigmaT']
@@ -71,6 +74,16 @@ def scattering(P, mcdc):
     P['ux'] = -1.0 + 2.0*rng(P, mcdc)
     
     P['event'] = EVENT_MOVE
+
+
+def async_fission(P, mcdc):
+    #print('in fission')
+    nu = mcdc['nu']
+
+    # Sample number of fission neutrons
+    n = math.floor(nu + rng(P, mcdc))
+    return n
+
 
 def fission(P, mcdc):
     #print('in fission')
@@ -109,7 +122,7 @@ def fission(P, mcdc):
     terminate_particle(P)
 
 def leakage(P, mcdc): 
-    print('in leak')
+    #print('in leak')
     if P['ux'] > 0.0:
         atomic_add(mcdc['tally'], 1, 1)
         atomic_add(mcdc['tally'], 1, 2)
@@ -118,6 +131,8 @@ def leakage(P, mcdc):
         atomic_add(mcdc['tally'], 1, 2)
     
     terminate_particle(P)
+
+
 
 # =============================================================================
 # RNG
@@ -195,6 +210,7 @@ def terminate_particle(P):
 get_idx = None
 def CPU_get_idx():
     return 0, 1
+
 def GPU_get_idx():
     return cuda.grid(1), cuda.gridsize(1)
 
@@ -254,10 +270,19 @@ def make_kernels(alg, target):
     # Functions
     # =========================================================================
 
+    global fission
+    if alg in [ 'async', 'async-multi', 'new-event', 'new-event-multi' ]:
+        target = 'gpu_device'
+        fission = async_fission
+
+    sub_target = target
+    if target == 'gpu':
+        sub_target = 'gpu_device'
+
     # RNG
     global rng, rng_skip_ahead
-    rng            = adapter.compiler(rng, target)
-    rng_skip_ahead = adapter.compiler(rng_skip_ahead, target)
+    rng            = adapter.compiler(rng, sub_target)
+    rng_skip_ahead = adapter.compiler(rng_skip_ahead, sub_target)
     
     # ========================================
     # Utilities
@@ -266,20 +291,21 @@ def make_kernels(alg, target):
     global read_particle, record_particle, terminate_particle, get_idx, create,\
            exscan, atomic_add
 
-    read_particle   = adapter.compiler(read_particle, target)
-    record_particle = adapter.compiler(record_particle, target)
-    terminate_particle = adapter.compiler(terminate_particle, target)
+    read_particle   = adapter.compiler(read_particle, sub_target)
+    record_particle = adapter.compiler(record_particle, sub_target)
+    terminate_particle = adapter.compiler(terminate_particle, sub_target)
     if target == 'cpu':
         get_idx = adapter.compiler(CPU_get_idx, target)
         create  = adapter.compiler(CPU_create, target)
         exscan  = adapter.compiler(CPU_exscan, target)
         atomic_add = adapter.compiler(CPU_atomic_add, target)
     else:
-        get_idx    = adapter.compiler(GPU_get_idx, target)
-        create     = adapter.compiler(GPU_create, target)
-        exscan     = adapter.compiler(GPU_exscan, target)
-        atomic_add = adapter.compiler(GPU_atomic_add, target)
-        sync       = adapter.compiler(GPU_sync, target)
+        #! added gpu_device in place of target
+        get_idx    = adapter.compiler(GPU_get_idx, sub_target)
+        create     = adapter.compiler(GPU_create, sub_target)
+        exscan     = adapter.compiler(GPU_exscan, sub_target)
+        atomic_add = adapter.compiler(GPU_atomic_add, sub_target)
+        sync       = adapter.compiler(GPU_sync, sub_target)
 
     global initialize_stack
 
@@ -289,12 +315,18 @@ def make_kernels(alg, target):
     # Events
     # =========================================================================
 
-    global source, move, leakage, scattering, fission, branchless_collision
+    global source, move, leakage, scattering, branchless_collision
     
     source                  = adapter.event(source, alg, target, EVENT_SOURCE)
-    move                    = adapter.event(move, alg, target, EVENT_MOVE, branching=True)
+    move                    = adapter.event(move, alg, target, EVENT_MOVE)#, branching=True)
     leakage                 = adapter.event(leakage, alg, target, EVENT_LEAKAGE)
     scattering              = adapter.event(scattering, alg, target, EVENT_SCATTERING)
     fission                 = adapter.event(fission, alg, target, EVENT_FISSION, naive=True)
     branchless_collision    = adapter.event(branchless_collision, alg, target, EVENT_BRANCHLESS_COLLISION)
+
+    
+
+
+
+
 
